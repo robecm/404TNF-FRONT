@@ -107,3 +107,92 @@
 .duration-2000 {
   transition-duration: 2000ms;
 }
+
+/* Slide-in from left/right for cards on scroll */
+@keyframes slideInFromLeft {
+  0% {
+    transform: translateX(-40px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideInFromRight {
+  0% {
+    transform: translateX(40px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.scroll-card {
+  opacity: 0;
+  transform: translateY(10px);
+  will-change: transform, opacity;
+}
+
+/* Barrido con clip-path: reveal desde el lateral + translate para movimiento */
+@keyframes revealFromLeft {
+  0% {
+    clip-path: inset(0 100% 0 0);
+    transform: translateX(-30px);
+    opacity: 0;
+  }
+  60% {
+    clip-path: inset(0 10% 0 0);
+    opacity: 1;
+  }
+  100% {
+    clip-path: inset(0 0 0 0);
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes revealFromRight {
+  0% {
+    clip-path: inset(0 0 0 100%);
+    transform: translateX(30px);
+    opacity: 0;
+  }
+  60% {
+    clip-path: inset(0 0 0 10%);
+    opacity: 1;
+  }
+  100% {
+    clip-path: inset(0 0 0 0);
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.scroll-card.from-left.in-view {
+  animation: revealFromLeft 700ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+.scroll-card.from-right.in-view {
+  animation: revealFromRight 700ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+/* Stagger effect: slight delay based on order */
+.scroll-card.from-left.in-view:nth-of-type(odd) {
+  animation-duration: 750ms;
+}
+.scroll-card.from-right.in-view:nth-of-type(even) {
+  animation-duration: 750ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scroll-card, .scroll-card::before, .scroll-card::after {
+    animation: none !important;
+    transition: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}

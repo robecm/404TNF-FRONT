@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Rocket, Star, Sparkles, Globe, Telescope, Orbit, Satellite } from 'lucide-react';
+import ExoplanetExamples from './components/ExoplanetExamples';
 
 interface StarType {
   id: number;
@@ -46,6 +47,37 @@ function App() {
     };
   }, []);
 
+  // Observador para animar las cards al hacer scroll (slide desde laterales)
+  useEffect(() => {
+    if (!isJourneyStarted) return;
+
+    const cards = document.querySelectorAll<HTMLElement>('.scroll-card');
+    if (cards.length === 0) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          const el = entry.target as HTMLElement;
+          if (entry.isIntersecting) {
+            // aplicar un pequeño stagger basado en data-index para efecto más natural
+            const idx = Number(el.dataset.index ?? 0);
+            el.style.animationDelay = `${idx * 120}ms`;
+            el.classList.add('in-view');
+            // una vez animada, dejamos de observar para mejorar rendimiento
+            observer.unobserve(el);
+          }
+        });
+      },
+      {
+        threshold: 0.15,
+      }
+    );
+
+    cards.forEach((c) => observer.observe(c));
+
+    return () => observer.disconnect();
+  }, [isJourneyStarted]);
+
   return (
     <div className="relative min-h-screen bg-gradient-to-b from-black via-indigo-950 to-purple-950 overflow-hidden">
       {/* Animated Stars */}
@@ -69,7 +101,7 @@ function App() {
                 animationDuration: `${star.duration}s`,
                 animationDelay: `${star.delay}s`,
                 transform: `translate(${parallaxX}px, ${parallaxY}px)`,
-                // @ts-ignore
+                // @ts-expect-error allow custom css variables
                 '--tx-start': txStart,
                 '--ty-start': tyStart,
               }}
@@ -150,14 +182,23 @@ function App() {
           {/* Content Container */}
           <div className="absolute inset-0 z-20 flex flex-col items-center px-4 py-12 overflow-y-auto">
             {/* Title at top */}
-            <h2 className="text-5xl md:text-7xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 animate-text-zoom mb-16 mt-8">
+            <h2 className="text-5xl md:text-7xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 animate-text-zoom mb-6 mt-8">
               Exoplanetas
             </h2>
+
+            {/* Imagen central de exoplaneta */}
+            <div className="w-full flex justify-center mb-12">
+              <img
+                src="/static/exoplanet.png"
+                alt="Exoplaneta"
+                className="w-40 md:w-56 lg:w-72 rounded-lg shadow-2xl object-contain animate-fade-in"
+              />
+            </div>
 
             {/* Cards Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-6xl w-full">
               {/* Card 1 */}
-              <div className="bg-gradient-to-br from-cyan-900/40 to-blue-900/40 backdrop-blur-md rounded-2xl p-8 border border-cyan-500/30 hover:border-cyan-400/60 transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-cyan-500/20">
+              <div data-index={0} className="scroll-card from-left bg-gradient-to-br from-cyan-900/40 to-blue-900/40 backdrop-blur-md rounded-2xl p-8 border border-cyan-500/30 hover:border-cyan-400/60 transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-cyan-500/20">
                 <div className="flex items-center gap-4 mb-4">
                   <Globe className="w-12 h-12 text-cyan-400" />
                   <h3 className="text-2xl font-bold text-cyan-100">¿Qué son?</h3>
@@ -168,7 +209,7 @@ function App() {
               </div>
 
               {/* Card 2 */}
-              <div className="bg-gradient-to-br from-blue-900/40 to-purple-900/40 backdrop-blur-md rounded-2xl p-8 border border-blue-500/30 hover:border-blue-400/60 transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-blue-500/20">
+              <div data-index={1} className="scroll-card from-right bg-gradient-to-br from-blue-900/40 to-purple-900/40 backdrop-blur-md rounded-2xl p-8 border border-blue-500/30 hover:border-blue-400/60 transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-blue-500/20">
                 <div className="flex items-center gap-4 mb-4">
                   <Telescope className="w-12 h-12 text-blue-400" />
                   <h3 className="text-2xl font-bold text-blue-100">Detección</h3>
@@ -179,7 +220,7 @@ function App() {
               </div>
 
               {/* Card 3 */}
-              <div className="bg-gradient-to-br from-purple-900/40 to-pink-900/40 backdrop-blur-md rounded-2xl p-8 border border-purple-500/30 hover:border-purple-400/60 transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-purple-500/20">
+              <div data-index={2} className="scroll-card from-left bg-gradient-to-br from-purple-900/40 to-pink-900/40 backdrop-blur-md rounded-2xl p-8 border border-purple-500/30 hover:border-purple-400/60 transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-purple-500/20">
                 <div className="flex items-center gap-4 mb-4">
                   <Orbit className="w-12 h-12 text-purple-400" />
                   <h3 className="text-2xl font-bold text-purple-100">Tipos</h3>
@@ -190,7 +231,7 @@ function App() {
               </div>
 
               {/* Card 4 */}
-              <div className="bg-gradient-to-br from-pink-900/40 to-cyan-900/40 backdrop-blur-md rounded-2xl p-8 border border-pink-500/30 hover:border-pink-400/60 transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-pink-500/20">
+              <div data-index={3} className="scroll-card from-right bg-gradient-to-br from-pink-900/40 to-cyan-900/40 backdrop-blur-md rounded-2xl p-8 border border-pink-500/30 hover:border-pink-400/60 transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-pink-500/20">
                 <div className="flex items-center gap-4 mb-4">
                   <Satellite className="w-12 h-12 text-pink-400" />
                   <h3 className="text-2xl font-bold text-pink-100">Importancia</h3>
@@ -199,6 +240,11 @@ function App() {
                   El estudio de exoplanetas nos ayuda a entender la formación de sistemas planetarios y buscar condiciones para la vida más allá de la Tierra.
                 </p>
               </div>
+            </div>
+
+            {/* Ejemplos de exoplanetas (debajo de las cards) */}
+            <div className="w-full max-w-6xl mt-12">
+              <ExoplanetExamples />
             </div>
           </div>
         </>
