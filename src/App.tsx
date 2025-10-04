@@ -179,7 +179,7 @@ function App() {
               onClick={() => setIsJourneyStarted(true)}
               className="px-8 py-4 bg-gradient-to-r from-cyan-500 to-blue-600 text-white text-lg font-semibold rounded-full hover:scale-105 transition-transform duration-300 shadow-lg shadow-cyan-500/50 hover:shadow-cyan-500/70"
             >
-              empieza a explorar
+              Empieza a explorar
             </button>
           </div>
         </div>
