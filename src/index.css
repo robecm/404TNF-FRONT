@@ -1,4 +1,13 @@
 :root {
+  /* Tailwind base will be injected; keep custom variables for fallback */
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* --- existing custom rules (kept and adapted) --- */
+:root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
