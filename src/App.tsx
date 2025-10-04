@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Rocket, Sparkles, Star, Globe, Telescope, Orbit, Satellite } from 'lucide-react';
 import ExoplanetExamples from './components/ExoplanetExamples';
 import ExoplanetCards from './components/ExoplanetCards';
+import ExoplanetDetail from './components/ExoplanetDetail';
 
 interface StarType {
   id: number;
@@ -16,6 +17,25 @@ function App() {
   const [stars, setStars] = useState<StarType[]>([]);
   const [isJourneyStarted, setIsJourneyStarted] = useState(false);
   const [mousePosition, setMousePosition] = useState({ x: 50, y: 50 });
+  const [routePlanet, setRoutePlanet] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Listen for history navigation to show detail pages under /exoplaneta/:name
+    const checkRoute = () => {
+      const p = window.location.pathname;
+      if (p.startsWith('/exoplaneta/')) {
+        setRoutePlanet(decodeURIComponent(p.replace('/exoplaneta/', '')));
+      } else {
+        setRoutePlanet(null);
+      }
+    };
+
+    checkRoute();
+    window.addEventListener('popstate', checkRoute);
+    return () => window.removeEventListener('popstate', checkRoute);
+  }, []);
+
+  // NOTE: Do not return early here because hooks below must run in the same order.
 
   useEffect(() => {
     const generateStars = () => {
@@ -79,10 +99,24 @@ function App() {
     return () => observer.disconnect();
   }, [isJourneyStarted]);
 
+  // If routePlanet is active, render only the detail page as a standalone route
+  if (routePlanet) {
+    return (
+      <ExoplanetDetail
+        plName={routePlanet}
+        onClose={() => {
+          history.pushState({}, '', '/');
+          window.dispatchEvent(new PopStateEvent('popstate'));
+        }}
+      />
+    );
+  }
+
   return (
+    <>
     <div className="relative min-h-screen bg-gradient-to-b from-black via-indigo-950 to-purple-950 overflow-hidden">
-      {/* Animated Stars */}
-      <div className={`absolute inset-0 flex items-center justify-center transition-opacity duration-1000 ${isJourneyStarted ? 'opacity-0' : 'opacity-100'}`}>
+  {/* Animated Stars */}
+  <div className={`absolute inset-0 flex items-center justify-center transition-opacity duration-1000 ${isJourneyStarted ? 'opacity-0' : 'opacity-100'}`}>
         {!isJourneyStarted && stars.map((star) => {
           const centerX = 50;
           const centerY = 50;
@@ -151,11 +185,10 @@ function App() {
         </div>
       </div>
 
-      {/* Bottom gradient overlay */}
-      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-black/50 to-transparent" />
+  {/* Bottom gradient overlay removed as requested */}
 
       {/* Journey Started Screen */}
-      {isJourneyStarted && (
+      {isJourneyStarted && !routePlanet && (
         <>
           {/* Background stars with mouse movement */}
           <div className="absolute inset-0 z-10">
@@ -255,7 +288,9 @@ function App() {
           </div>
         </>
       )}
+
     </div>
+    </>
   );
 }
 

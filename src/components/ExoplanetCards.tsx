@@ -132,7 +132,12 @@ const ExoplanetCards: FC = () => {
             </p>
 
             <button
-              onClick={() => window.alert(`Explorar: ${e.pl_name}`)}
+              onClick={() => {
+                const path = `/exoplaneta/${encodeURIComponent(e.pl_name)}`;
+                history.pushState({ pl_name: e.pl_name }, '', path);
+                // dispatch popstate so app-level listener can react
+                window.dispatchEvent(new PopStateEvent('popstate'));
+              }}
               className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-md shadow-md hover:scale-105 transition-transform duration-200"
             >
               <Star className="w-4 h-4" />
