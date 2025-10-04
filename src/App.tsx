@@ -158,7 +158,7 @@ function App() {
 
           {/* Title */}
           <h1 className="text-7xl md:text-8xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 animate-fade-in">
-            Space Project
+            Exoptolemy
           </h1>
 
           {/* Subtitle */}
@@ -179,7 +179,7 @@ function App() {
               onClick={() => setIsJourneyStarted(true)}
               className="px-8 py-4 bg-gradient-to-r from-cyan-500 to-blue-600 text-white text-lg font-semibold rounded-full hover:scale-105 transition-transform duration-300 shadow-lg shadow-cyan-500/50 hover:shadow-cyan-500/70"
             >
-              Begin Your Journey
+              empieza a explorar
             </button>
           </div>
         </div>

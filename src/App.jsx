@@ -82,8 +82,8 @@ function App() {
       </div>
 
       <main className="relative z-10 text-center px-6 py-24">
-        <h1 ref={titleRef} className="text-5xl sm:text-6xl font-extrabold mb-4 tracking-tight">space-proyec</h1>
-        <p className="text-slate-400 max-w-xl mx-auto">Un pequeño demo con estrellas animadas y zoom-in usando anime.js</p>
+  <h1 ref={titleRef} className="text-5xl sm:text-6xl font-extrabold mb-4 tracking-tight">Exoptolemy</h1>
+  <p className="text-slate-400 max-w-xl mx-auto">Un pequeño demo con estrellas animadas y zoom-in usando GSAP</p>
       </main>
     </div>
   )

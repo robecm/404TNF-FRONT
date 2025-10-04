@@ -26,7 +26,7 @@ function toEyesSlug(name: string) {
   return name
     .trim()
     .replace(/\s+/g, "_") // espacios -> guión bajo
-    .replace(/[^\w\-]/g, ""); // deja letras/números/_ y - (quita otros símbolos)
+      .replace(/[^\w-]/g, ""); // deja letras/números/_ y - (quita otros símbolos)
 }
 
 const ExoplanetDetail: FC<{ plName?: string; onClose?: () => void }> = ({
