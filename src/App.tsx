@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import { Rocket, Sparkles, Star } from 'lucide-react';
+import { Telescope, Sparkles, Star } from 'lucide-react';
 import ExoplanetExamples from './components/ExoplanetExamples';
 import ExoplanetCards from './components/ExoplanetCards';
 import JourneyCards from './components/JourneyCards';
 import TransitExplanation from './components/TransitExplanation';
 import ExoplanetDetail from './components/ExoplanetDetail';
+import PosibleExo from './components/PosibleExo';
 
 interface StarType {
   id: number;
@@ -82,8 +83,11 @@ function App() {
     const checkRoute = (ev?: PopStateEvent) => {
       const p = window.location.pathname;
   // depuración: checkRoute invoked (silenciado en producción)
-      if (p.startsWith('/exoplaneta/')) {
-        setRoutePlanet(decodeURIComponent(p.replace('/exoplaneta/', '')));
+        if (p.startsWith('/exoplaneta/')) {
+          setRoutePlanet(decodeURIComponent(p.replace('/exoplaneta/', '')));
+        } else if (p.startsWith('/posibleExo/')) {
+          // Usamos routePlanet para alojar rutas de detalle (reutilidad mínima)
+          setRoutePlanet(decodeURIComponent(p.replace('/posibleExo/', '')));
       } else {
         setRoutePlanet(null);
         // Si viene de una navegación (popstate) o ya visitó un detalle antes,
@@ -188,6 +192,16 @@ function App() {
 
   // If routePlanet is active, render only the detail page as a standalone route
   if (routePlanet) {
+    // Distinguir si la ruta era /posibleExo/ o /exoplaneta/ por inspección sencilla
+    const p = window.location.pathname;
+    if (p.startsWith('/posibleExo/')) {
+      return (
+        <PosibleExo
+          name={routePlanet}
+        />
+      );
+    }
+
     return (
       <ExoplanetDetail
         plName={routePlanet}
@@ -205,8 +219,8 @@ function App() {
   }
 
   return (
-    <>
-    <div className="relative min-h-screen bg-gradient-to-b from-black via-indigo-950 to-purple-950 overflow-hidden">
+  <>
+  <div className="relative min-h-screen bg-gradient-to-b from-black via-indigo-950 to-purple-950 overflow-hidden">
   {/* Animated Stars */}
   <div className={`absolute inset-0 flex items-center justify-center transition-opacity duration-1000 ${isJourneyStarted ? 'opacity-0' : 'opacity-100'}`}>
         {!isJourneyStarted && stars.map((star) => {
@@ -243,19 +257,19 @@ function App() {
           {/* Logo/Icon */}
           <div className="flex justify-center mb-8 animate-float">
             <div className="relative">
-              <Rocket className="w-24 h-24 text-cyan-400" strokeWidth={1.5} />
+              <Telescope className="w-24 h-24 text-cyan-400" strokeWidth={1.5} />
               <Sparkles className="w-8 h-8 text-yellow-300 absolute -top-2 -right-2 animate-pulse" />
             </div>
           </div>
 
           {/* Title */}
           <h1 className="text-7xl md:text-8xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 animate-fade-in">
-            Exoptolemy
+            ExoPtolemy
           </h1>
 
           {/* Subtitle */}
           <p className="text-xl md:text-2xl text-cyan-100 animate-fade-in-delay">
-            Explore the infinite cosmos and discover the wonders of the universe
+            Explora el cosmos infinito y descubre las maravillas del universo
           </p>
 
           {/* Stars decoration */}

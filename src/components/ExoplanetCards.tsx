@@ -1,4 +1,4 @@
-import { useEffect, useState, FC } from "react";
+import { useEffect, useState, useRef, FC } from "react";
 import { Globe, Star } from "lucide-react";
 import ExoplanetSearchForm from './ExoplanetSearchForm';
 import ExoplanetBulkUpload from './ExoplanetBulkUpload';
@@ -18,7 +18,7 @@ type Exoplanet = {
 // En desarrollo Vite normalmente usa un proxy en /api; en producción debes
 // apuntar VITE_API_BASE a tu backend (por ejemplo https://api.exoptolemy.study)
 const API_QUERY =
-  'select top 12 pl_name,hostname,discoverymethod,disc_year,pl_rade,pl_bmasse,sy_dist from pscomppars order by disc_year desc';
+  'select top 120 pl_name,hostname,discoverymethod,disc_year,pl_rade,pl_bmasse,sy_dist from pscomppars order by disc_year desc';
 
 // Acceso seguro a import.meta.env usando optional chaining para evitar errores en runtime
 // (por ejemplo cuando import.meta.env no está disponible en el entorno de ejecución)
@@ -79,7 +79,9 @@ const ExoplanetCards: FC = () => {
   const [planets, setPlanets] = useState<Exoplanet[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [imageSrcs, setImageSrcs] = useState<string[]>([]);
+  const [imageSrcs, setImageSrcs] = useState<(string | null)[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 12;
 
   useEffect(() => {
     const attemptFetch = async () => {
@@ -110,44 +112,11 @@ const ExoplanetCards: FC = () => {
           return;
         }
 
-        // Prefetch images as blobs to avoid browser 404s (only in development)
-        const createdBlobs: string[] = [];
-        const fetchImageFor = async (p: Exoplanet): Promise<string> => {
-          const attempts = 3;
-          const baseIdx = indexFromName(p.pl_name);
-          for (let t = 0; t < attempts; t++) {
-            const nextIdx = ((baseIdx + t) % MAX_NASA_INDEX) + 1;
-            const candidate = buildNasaImageUrl(p.pl_name, p.pl_rade, p.pl_bmasse, nextIdx);
-            if (failedImageUrls.has(candidate)) continue;
-            try {
-              const res = await fetch(candidate);
-              if (!res.ok) {
-                failedImageUrls.add(candidate);
-                continue;
-              }
-              const blob = await res.blob();
-              const blobUrl = URL.createObjectURL(blob);
-              createdBlobs.push(blobUrl);
-              return blobUrl;
-            } catch {
-              failedImageUrls.add(candidate);
-              continue;
-            }
-          }
-          return BACKUP_IMG;
-        };
-        
-
-        let mounted = true;
-        Promise.all(withImgs.map((p) => fetchImageFor(p))).then((srcs) => {
-          if (mounted) setImageSrcs(srcs);
-        });
-
-        // cleanup: revocar blobs creados cuando el componente se desmonte o los datos cambien
-        return () => {
-          mounted = false;
-          createdBlobs.forEach((b) => URL.revokeObjectURL(b));
-        };
+        // Desarrollo: preparar array de imageSrcs con nulls; las cargaremos por página
+        setImageSrcs(new Array(withImgs.length).fill(null));
+        // almacenaremos blobs creados para revocarlos al desmontar
+        // (no usar createdBlobs local aquí porque necesitamos revocarlos fuera)
+        return;
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         setError(msg);
@@ -157,6 +126,84 @@ const ExoplanetCards: FC = () => {
     };
 
     attemptFetch();
+  }, []);
+
+  // Paginación
+  const totalPages = Math.max(1, Math.ceil(planets.length / PAGE_SIZE));
+  // asegurar que la página actual sea válida si cambian los planets
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(1);
+  }, [planets.length, totalPages, currentPage]);
+
+  // ref para blobs creados y evitar fugas de memoria
+  const createdBlobsRef = useRef<string[]>([]);
+
+  // helper: cargar imágenes para una página concreta (solo en dev)
+  useEffect(() => {
+    if (planets.length === 0) return;
+    const isProd = typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+    if (isProd) return;
+
+    let mounted = true;
+
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const end = Math.min(planets.length, start + PAGE_SIZE);
+
+    const fetchImageFor = async (p: Exoplanet): Promise<string | null> => {
+      const attempts = 3;
+      const baseIdx = indexFromName(p.pl_name);
+      for (let t = 0; t < attempts; t++) {
+        const nextIdx = ((baseIdx + t) % MAX_NASA_INDEX) + 1;
+        const candidate = buildNasaImageUrl(p.pl_name, p.pl_rade, p.pl_bmasse, nextIdx);
+        if (failedImageUrls.has(candidate)) continue;
+        try {
+          const res = await fetch(candidate);
+          if (!res.ok) {
+            failedImageUrls.add(candidate);
+            continue;
+          }
+          const blob = await res.blob();
+          const blobUrl = URL.createObjectURL(blob);
+          createdBlobsRef.current.push(blobUrl);
+          return blobUrl;
+        } catch {
+          failedImageUrls.add(candidate);
+          continue;
+        }
+      }
+      return BACKUP_IMG;
+    };
+
+    (async () => {
+      const promises: Promise<void>[] = [];
+      for (let i = start; i < end; i++) {
+        if (imageSrcs[i]) continue; // ya cargada
+        const idx = i;
+        const p = planets[idx];
+        const promise = fetchImageFor(p).then((src) => {
+          if (!mounted) return;
+          setImageSrcs((prev) => {
+            const copy = prev.slice();
+            copy[idx] = src ?? BACKUP_IMG;
+            return copy;
+          });
+        });
+        promises.push(promise);
+      }
+      await Promise.all(promises);
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [currentPage, planets, imageSrcs]);
+
+  // cleanup blobs al desmontar
+  useEffect(() => {
+    return () => {
+      createdBlobsRef.current.forEach((b) => URL.revokeObjectURL(b));
+      createdBlobsRef.current = [];
+    };
   }, []);
 
   if (loading)
@@ -171,7 +218,9 @@ const ExoplanetCards: FC = () => {
       </h3>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {planets.map((e, idx) => (
+        {planets.slice((currentPage - 1) * PAGE_SIZE, (currentPage - 1) * PAGE_SIZE + PAGE_SIZE).map((e, idxRel) => {
+          const idx = (currentPage - 1) * PAGE_SIZE + idxRel;
+          return (
           <div
             key={e.pl_name}
             data-index={idx}
@@ -225,7 +274,37 @@ const ExoplanetCards: FC = () => {
               Explorar el exoplaneta
             </button>
           </div>
+          );
+        })}
+      </div>
+
+      {/* Pagination controls */}
+      <div className="mt-6 flex items-center justify-center gap-3">
+        <button
+          onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+          disabled={currentPage === 1}
+          className="px-3 py-1 bg-slate-800 text-slate-200 rounded disabled:opacity-50"
+        >
+          Anterior
+        </button>
+
+        {Array.from({ length: totalPages }).map((_, i) => (
+          <button
+            key={`pg-${i+1}`}
+            onClick={() => setCurrentPage(i + 1)}
+            className={`px-3 py-1 rounded ${currentPage === i + 1 ? 'bg-cyan-600 text-white' : 'bg-slate-800 text-slate-200'}`}
+          >
+            {i + 1}
+          </button>
         ))}
+
+        <button
+          onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+          disabled={currentPage === totalPages}
+          className="px-3 py-1 bg-slate-800 text-slate-200 rounded disabled:opacity-50"
+        >
+          Siguiente
+        </button>
       </div>
       {/* Formulario para buscar/registrar tu propio exoplaneta */}
       <div className="mt-8">
