@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, FC } from "react";
 import { Globe, Star } from "lucide-react";
 import ExoplanetSearchForm from './ExoplanetSearchForm';
-import ExoplanetBulkUpload from './ExoplanetBulkUpload';
+import ExoplanetIdForm from './ExoplanetIdForm';
 
 type Exoplanet = {
   pl_name: string;
@@ -333,7 +333,7 @@ const ExoplanetCards: FC = () => {
         <ExoplanetSearchForm />
       </div>
       <div className="mt-4">
-        <ExoplanetBulkUpload />
+        <ExoplanetIdForm />
       </div>
     </div>
   );

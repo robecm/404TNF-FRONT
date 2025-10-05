@@ -307,8 +307,8 @@ const ExoplanetSearchForm: FC = () => {
 
         <div>
           <div className="flex items-center">
-            <label className="text-sm text-slate-300">koi_prad (Radio del planeta, R⊕)</label>
-            <InfoIcon text={"koi_prad: número decimal. Radio del planeta en radios terrestres (ej: 2.5). Es la característica más importante: objetos muy grandes suelen ser estrellas, no planetas."} />
+            <label className="text-sm text-slate-300">Radio del Planeta</label>
+            <InfoIcon text={"Medido en radios terrestres (ej: 1.0 para un planeta del tamaño de la Tierra)."} />
           </div>
           <input
             value={form.koi_prad}
@@ -329,8 +329,8 @@ const ExoplanetSearchForm: FC = () => {
 
         <div>
           <div className="flex items-center">
-            <label className="text-sm text-slate-300">koi_model_snr (SNR)</label>
-            <InfoIcon text={"koi_model_snr: número decimal. Relación señal/ruido del tránsito; valores mayores indican una observación más confiable."} />
+            <label className="text-sm text-slate-300">Claridad de la Señal (SNR)</label>
+            <InfoIcon text={"Un número más alto indica una señal de tránsito más fuerte y confiable."} />
           </div>
           <input
             value={form.koi_model_snr}
@@ -350,8 +350,8 @@ const ExoplanetSearchForm: FC = () => {
 
         <div>
           <div className="flex items-center">
-            <label className="text-sm text-slate-300">koi_depth (Profundidad, ppm)</label>
-            <InfoIcon text={"koi_depth: número decimal en ppm (parts-per-million). Cuánto se oscureció la estrella en el tránsito; relacionado con el radio del planeta."} />
+            <label className="text-sm text-slate-300">Profundidad del Tránsito (ppm)</label>
+            <InfoIcon text={"Cuánto se oscureció la estrella, en partes por millón."} />
           </div>
           <input
             value={form.koi_depth}
@@ -372,8 +372,8 @@ const ExoplanetSearchForm: FC = () => {
 
         <div>
           <div className="flex items-center">
-            <label className="text-sm text-slate-300">koi_impact (Impact parameter)</label>
-            <InfoIcon text={"koi_impact: número decimal entre 0 y 1. Indica qué tan centrado fue el tránsito (0 = ecuatorial, 1 = muy de borde). Ayuda a distinguir tránsitos planetarios de eclipses estelares."} />
+            <label className="text-sm text-slate-300">Parámetro de Impacto</label>
+            <InfoIcon text={"Qué tan centrado fue el tránsito (0 = por el ecuador, 1 = rozando el polo)."} />
           </div>
           <input
             value={form.koi_impact}
@@ -394,8 +394,8 @@ const ExoplanetSearchForm: FC = () => {
 
         <div>
           <div className="flex items-center">
-            <label className="text-sm text-slate-300">koi_duration (Duración en horas)</label>
-            <InfoIcon text={"koi_duration: número decimal. Duración total del tránsito en horas. Debe ser coherente con una órbita; duraciones anómalas pueden indicar falsos positivos."} />
+            <label className="text-sm text-slate-300">Duración del Tránsito (horas)</label>
+            <InfoIcon text={"El tiempo total que el planeta tardó en cruzar frente a la estrella."} />
           </div>
           <input
             value={form.koi_duration}
@@ -416,8 +416,8 @@ const ExoplanetSearchForm: FC = () => {
 
         <div>
           <div className="flex items-center">
-            <label className="text-sm text-slate-300">koi_period (Período, días)</label>
-            <InfoIcon text={"koi_period: tiempo orbital en días. Tránsitos deben repetirse con esta periodicidad."} />
+            <label className="text-sm text-slate-300">Período Orbital (días)</label>
+            <InfoIcon text={"El tiempo que tarda el planeta en completar una órbita (su \"año\")."} />
           </div>
           <input
             value={form.koi_period}
@@ -436,7 +436,7 @@ const ExoplanetSearchForm: FC = () => {
 
         <div>
           <div className="flex items-center">
-            <label className="text-sm text-slate-300">koi_time0bk (Época, BKJD)</label>
+            <label className="text-sm text-slate-300">Época del Tránsito (BKJD)</label>
             <InfoIcon text={"koi_time0bk: época del tránsito en BKJD (Barycentric Kepler Julian Date)."} />
           </div>
           <input
@@ -455,7 +455,7 @@ const ExoplanetSearchForm: FC = () => {
 
         <div>
           <div className="flex items-center">
-            <label className="text-sm text-slate-300">koi_teq (Temperatura de equilibrio, K)</label>
+            <label className="text-sm text-slate-300">Temperatura de Equilibrio (K)</label>
             <InfoIcon text={"koi_teq: temperatura de equilibrio estimada en Kelvin."} />
           </div>
           <input
@@ -475,7 +475,7 @@ const ExoplanetSearchForm: FC = () => {
 
         <div>
           <div className="flex items-center">
-            <label className="text-sm text-slate-300">koi_insol (Insolación, relativo a la Tierra)</label>
+            <label className="text-sm text-slate-300">Nivel de Insolación</label>
             <InfoIcon text={"koi_insol: flujo recibido relativo a la Tierra (1 = misma insolación que la Tierra)."} />
           </div>
           <input
@@ -495,7 +495,7 @@ const ExoplanetSearchForm: FC = () => {
 
         <div>
           <div className="flex items-center">
-            <label className="text-sm text-slate-300">koi_steff (Temperatura estelar, K)</label>
+            <label className="text-sm text-slate-300">Temperatura de la Estrella (K)</label>
             <InfoIcon text={"koi_steff: temperatura efectiva de la estrella anfitriona en Kelvin."} />
           </div>
           <input
@@ -515,7 +515,7 @@ const ExoplanetSearchForm: FC = () => {
 
         <div>
           <div className="flex items-center">
-            <label className="text-sm text-slate-300">koi_slogg (log g estelar)</label>
+            <label className="text-sm text-slate-300">Gravedad Estelar (log g)</label>
             <InfoIcon text={"koi_slogg: logaritmo de la gravedad superficial de la estrella (log g)."} />
           </div>
           <input
@@ -534,7 +534,7 @@ const ExoplanetSearchForm: FC = () => {
 
         <div>
           <div className="flex items-center">
-            <label className="text-sm text-slate-300">koi_srad (Radio estelar, R☉)</label>
+            <label className="text-sm text-slate-300">Radio de la Estrella (R☉)</label>
             <InfoIcon text={"koi_srad: radio de la estrella en radios solares."} />
           </div>
           <input
