@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
-import { Rocket, Sparkles, Star, Globe, Telescope, Orbit, Satellite } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Rocket, Sparkles, Star } from 'lucide-react';
 import ExoplanetExamples from './components/ExoplanetExamples';
 import ExoplanetCards from './components/ExoplanetCards';
+import JourneyCards from './components/JourneyCards';
 import ExoplanetDetail from './components/ExoplanetDetail';
 
 interface StarType {
@@ -16,24 +17,59 @@ interface StarType {
 function App() {
   const [stars, setStars] = useState<StarType[]>([]);
   const [isJourneyStarted, setIsJourneyStarted] = useState(false);
+  const [showJourneyCards, setShowJourneyCards] = useState(false);
   const [mousePosition, setMousePosition] = useState({ x: 50, y: 50 });
   const [routePlanet, setRoutePlanet] = useState<string | null>(null);
+  const hadDetailRef = useRef(false);
 
   useEffect(() => {
     // Listen for history navigation to show detail pages under /exoplaneta/:name
-    const checkRoute = () => {
+    // We want to distinguish initial load (no popstate event) from user navigation
+    const checkRoute = (ev?: PopStateEvent) => {
       const p = window.location.pathname;
+      // console.debug para depuración
+      console.debug('[checkRoute] pop?', !!ev, 'path=', p);
       if (p.startsWith('/exoplaneta/')) {
         setRoutePlanet(decodeURIComponent(p.replace('/exoplaneta/', '')));
       } else {
         setRoutePlanet(null);
+        // Si viene de una navegación (popstate) o ya visitó un detalle antes,
+        // queremos volver a mostrar la pantalla de journey
+        if ((ev && ev.type === 'popstate') || hadDetailRef.current) {
+          setShowJourneyCards(true);
+        }
       }
     };
 
+    // llamada inicial sin evento
     checkRoute();
-    window.addEventListener('popstate', checkRoute);
-    return () => window.removeEventListener('popstate', checkRoute);
+    // on popstate pasaremos el event para que la función pueda detectar navegación atrás/adelante
+    window.addEventListener('popstate', checkRoute as EventListener);
+    return () => window.removeEventListener('popstate', checkRoute as EventListener);
   }, []);
+
+  // Listener adicional: si el usuario navega con el botón Atrás del navegador
+  // y la ruta resultante es '/', aseguramos que se muestre la pantalla de 'journey'
+  useEffect(() => {
+    const onPopShowJourney = () => {
+      console.debug('[onPopShowJourney] path=', window.location.pathname);
+      if (window.location.pathname === '/') setShowJourneyCards(true);
+    };
+    window.addEventListener('popstate', onPopShowJourney);
+    return () => window.removeEventListener('popstate', onPopShowJourney);
+  }, []);
+
+  // Si el usuario visitó un detalle y luego regresa (routePlanet pasa a null),
+  // activamos la pantalla de journey. Evita que esto ocurra en la carga inicial.
+  useEffect(() => {
+    if (routePlanet) {
+      hadDetailRef.current = true;
+    } else if (hadDetailRef.current && !routePlanet) {
+      console.debug('[routePlanet effect] returning from detail, show journey');
+      setShowJourneyCards(true);
+      hadDetailRef.current = false;
+    }
+  }, [routePlanet]);
 
   // NOTE: Do not return early here because hooks below must run in the same order.
 
@@ -105,7 +141,12 @@ function App() {
       <ExoplanetDetail
         plName={routePlanet}
         onClose={() => {
+          // Al cerrar detalle, volvemos a la ruta raíz y mostramos la pantalla de 'journey'
           history.pushState({}, '', '/');
+          // mostrar solo las journey cards bajo el hero (no activar la pantalla completa)
+          setShowJourneyCards(true);
+          // asegurarnos de que la pantalla completa no esté activa
+          setIsJourneyStarted(false);
           window.dispatchEvent(new PopStateEvent('popstate'));
         }}
       />
@@ -182,6 +223,12 @@ function App() {
               Empieza a explorar
             </button>
           </div>
+          {/* Journey cards (visible when user returns from detail) */}
+          {showJourneyCards && (
+            <div className="mt-12">
+              <JourneyCards />
+            </div>
+          )}
         </div>
       </div>
 
@@ -229,52 +276,8 @@ function App() {
               />
             </div>
 
-            {/* Cards Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-6xl w-full">
-              {/* Card 1 */}
-              <div data-index={0} className="scroll-card from-left bg-gradient-to-br from-cyan-900/40 to-blue-900/40 backdrop-blur-md rounded-2xl p-8 border border-cyan-500/30 hover:border-cyan-400/60 transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-cyan-500/20">
-                <div className="flex items-center gap-4 mb-4">
-                  <Globe className="w-12 h-12 text-cyan-400" />
-                  <h3 className="text-2xl font-bold text-cyan-100">¿Qué son?</h3>
-                </div>
-                <p className="text-cyan-50/80 leading-relaxed">
-                  Los exoplanetas son planetas que orbitan estrellas fuera de nuestro sistema solar. Desde el primer descubrimiento en 1995, hemos encontrado miles de estos mundos distantes.
-                </p>
-              </div>
-
-              {/* Card 2 */}
-              <div data-index={1} className="scroll-card from-right bg-gradient-to-br from-blue-900/40 to-purple-900/40 backdrop-blur-md rounded-2xl p-8 border border-blue-500/30 hover:border-blue-400/60 transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-blue-500/20">
-                <div className="flex items-center gap-4 mb-4">
-                  <Telescope className="w-12 h-12 text-blue-400" />
-                  <h3 className="text-2xl font-bold text-blue-100">Detección</h3>
-                </div>
-                <p className="text-blue-50/80 leading-relaxed">
-                  Se detectan mediante métodos como el tránsito (cuando pasan frente a su estrella) y la velocidad radial (por el bamboleo de la estrella debido a la gravedad del planeta).
-                </p>
-              </div>
-
-              {/* Card 3 */}
-              <div data-index={2} className="scroll-card from-left bg-gradient-to-br from-purple-900/40 to-pink-900/40 backdrop-blur-md rounded-2xl p-8 border border-purple-500/30 hover:border-purple-400/60 transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-purple-500/20">
-                <div className="flex items-center gap-4 mb-4">
-                  <Orbit className="w-12 h-12 text-purple-400" />
-                  <h3 className="text-2xl font-bold text-purple-100">Tipos</h3>
-                </div>
-                <p className="text-purple-50/80 leading-relaxed">
-                  Existen diversos tipos: desde gigantes gaseosos más grandes que Júpiter hasta planetas rocosos similares a la Tierra. Algunos están en la "zona habitable" de su estrella.
-                </p>
-              </div>
-
-              {/* Card 4 */}
-              <div data-index={3} className="scroll-card from-right bg-gradient-to-br from-pink-900/40 to-cyan-900/40 backdrop-blur-md rounded-2xl p-8 border border-pink-500/30 hover:border-pink-400/60 transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-pink-500/20">
-                <div className="flex items-center gap-4 mb-4">
-                  <Satellite className="w-12 h-12 text-pink-400" />
-                  <h3 className="text-2xl font-bold text-pink-100">Importancia</h3>
-                </div>
-                <p className="text-pink-50/80 leading-relaxed">
-                  El estudio de exoplanetas nos ayuda a entender la formación de sistemas planetarios y buscar condiciones para la vida más allá de la Tierra.
-                </p>
-              </div>
-            </div>
+            {/* Cards Grid (moved to JourneyCards component) */}
+            <JourneyCards />
 
             {/* Dynamic Exoplanet Cards (fetched from remote via proxy) */}
             <div className="w-full max-w-6xl">
