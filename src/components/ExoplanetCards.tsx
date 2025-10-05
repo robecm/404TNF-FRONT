@@ -24,7 +24,14 @@ const API_QUERY =
 // (por ejemplo cuando import.meta.env no está disponible en el entorno de ejecución)
 const meta = (typeof import.meta !== 'undefined' ? (import.meta as unknown as { env?: Record<string, string | undefined> }) : undefined);
 const API_BASE = meta?.env?.VITE_API_BASE || '';
-const API_URL = `${API_BASE}/api/exoplanets?query=${encodeURIComponent(API_QUERY)}&format=json`;
+
+function buildApiUrl(query: string) {
+  const q = encodeURIComponent(query);
+  // Usar siempre el proxy serverless /api/exoplanets en producción y desarrollo
+  // Si VITE_API_BASE está configurado (por ejemplo para entornos personalizados), usarla como base
+  if (API_BASE) return `${API_BASE}/api/exoplanets?query=${q}&format=json`;
+  return `/api/exoplanets?query=${q}&format=json`;
+}
 
 // Base de imágenes NASA
 const NASA_IMG_BASE =
@@ -89,7 +96,8 @@ const ExoplanetCards: FC = () => {
       setError(null);
       const altUrl = `/api/exoplanets?query=${encodeURIComponent(API_QUERY)}&format=json`;
       try {
-        let res = await fetch(API_URL);
+        const apiUrl = buildApiUrl(API_QUERY);
+        let res = await fetch(apiUrl);
         if (!res.ok) {
           // intentar URL alternativa relativa; no loguear en consola para evitar ruido en producción
           res = await fetch(altUrl);
