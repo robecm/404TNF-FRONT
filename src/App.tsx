@@ -27,7 +27,7 @@ function App() {
 
   useEffect(() => {
     let mounted = true;
-    const localPath = `${import.meta.env.BASE_URL || '/'}src/static/exoplanet.png`;
+  const localPath = `${import.meta.env.BASE_URL || '/'}static/exoplanet.png`;
     const nasaBackup = 'https://assets.science.nasa.gov/dynamicimage/assets/science/astro/exo-explore/assets/content/planets/neptunelike-8.jpg?fit=clip&crop=faces%2Cfocalpoint&w=300';
 
     // Bundled asset URL (pacquetizado por Vite). Se usa como último recurso y no genera 404s externos.
@@ -336,7 +336,7 @@ function App() {
             {/* Imagen central de exoplaneta */}
             <div className="w-full flex justify-center mb-12">
               <img
-                src={exoplanetImgSrc || `${import.meta.env.BASE_URL || '/'}src/static/exoplanet.png`}
+                src={exoplanetImgSrc || `${import.meta.env.BASE_URL || '/'}static/exoplanet.png`}
                 alt="Exoplaneta"
                 className="w-40 md:w-56 lg:w-72 rounded-lg shadow-2xl object-contain animate-fade-in"
               />
