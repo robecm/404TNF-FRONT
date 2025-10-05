@@ -1,79 +1,122 @@
-// Simple proxy for https://exoplanetarchive.ipac.caltech.edu/TAP/sync
-// This file is intended to be deployed on Vercel as a Serverless Function under /api/exoplanets
-// It forwards the incoming query string to the upstream TAP sync endpoint and returns the response.
+import https from 'https';
+import { URL } from 'url';
 
-module.exports = async (req, res) => {
-  const targetBase = 'https://exoplanetarchive.ipac.caltech.edu/TAP/sync';
+// Simple in-memory cache for a single server instance (ephemeral on serverless)
+// key -> { status, headers, body(Buffer), expires }
+const CACHE = new Map();
+const DEFAULT_TTL = 300; // seconds
+
+function sendJson(res, status, obj) {
+  res.statusCode = status;
+  res.setHeader('content-type', 'application/json; charset=utf-8');
+  res.end(JSON.stringify(obj));
+}
+
+export default async function handler(req, res) {
   try {
-    // Build upstream URL preserving the incoming query string
-    const incoming = req.url || '';
-    const qs = incoming.includes('?') ? incoming.split('?').slice(1).join('?') : '';
-    const upstreamUrl = qs ? `${targetBase}?${qs}` : targetBase;
-
-    // Ensure global fetch exists in the runtime
-    if (typeof globalThis.fetch !== 'function') {
-      console.error('Global fetch is not available in this runtime.');
-      res.statusCode = 501;
-      res.setHeader('content-type', 'application/json');
-      return res.end(JSON.stringify({ error: 'FetchUnavailable', message: 'Server runtime does not provide fetch. Use a Node 18+ runtime or enable fetch.' }));
-    }
-
-    // Forward minimal headers
-    const forwardHeaders = {};
-    if (req.headers['accept']) forwardHeaders.accept = req.headers['accept'];
-    if (req.headers['user-agent']) forwardHeaders['user-agent'] = req.headers['user-agent'];
-
-    // Read body only for non-GET/HEAD methods
-    let body = undefined;
     if (req.method !== 'GET' && req.method !== 'HEAD') {
-      body = await new Promise((resolve) => {
+      res.setHeader('allow', 'GET, HEAD');
+      return sendJson(res, 405, { error: 'MethodNotAllowed' });
+    }
+
+    const incoming = req.url || '';
+    const parts = incoming.split('?');
+    const qs = parts.length > 1 ? parts.slice(1).join('?') : '';
+
+    if (!qs) {
+      return sendJson(res, 400, { error: 'MissingQuery', message: 'Expected query string with TAP SQL query' });
+    }
+
+    const cacheKey = qs;
+    const now = Date.now();
+    const cached = CACHE.get(cacheKey);
+    if (cached && cached.expires > now) {
+      // Serve from cache
+      res.statusCode = cached.status;
+      Object.entries(cached.headers || {}).forEach(([k, v]) => {
+        try { res.setHeader(k, v); } catch (e) {}
+      });
+      res.setHeader('x-cache', 'HIT');
+      return res.end(cached.body);
+    }
+
+    // Build options for upstream request
+    const upstreamUrl = new URL(`https://exoplanetarchive.ipac.caltech.edu/TAP/sync?${qs}`);
+
+    const options = {
+      hostname: upstreamUrl.hostname,
+      port: 443,
+      path: upstreamUrl.pathname + upstreamUrl.search,
+      method: 'GET',
+      headers: {
+        accept: req.headers['accept'] || 'application/json',
+        'user-agent': req.headers['user-agent'] || 'space-app-proxy/1.0',
+      },
+    };
+
+    const ttl = DEFAULT_TTL;
+
+    await new Promise((resolve, reject) => {
+      const upstreamReq = https.request(options, (upstreamRes) => {
+        const status = upstreamRes.statusCode || 200;
+        const contentType = upstreamRes.headers['content-type'];
+        const upstreamCache = upstreamRes.headers['cache-control'];
+
+        if (contentType) res.setHeader('content-type', contentType);
+        if (upstreamCache) res.setHeader('cache-control', upstreamCache);
+        else res.setHeader('cache-control', `s-maxage=${ttl}, stale-while-revalidate=60`);
+
+        res.setHeader('x-cache', 'MISS');
+
         const chunks = [];
-        req.on('data', (c) => chunks.push(c));
-        req.on('end', () => resolve(Buffer.concat(chunks)));
-        req.on('error', () => resolve(undefined));
+        upstreamRes.on('data', (chunk) => {
+          chunks.push(chunk);
+          try { res.write(chunk); } catch (e) {}
+        });
+
+        upstreamRes.on('end', () => {
+          try { res.end(); } catch (e) {}
+          try {
+            const body = Buffer.concat(chunks);
+            CACHE.set(cacheKey, {
+              status,
+              headers: {
+                'content-type': res.getHeader('content-type') || 'application/octet-stream',
+                'cache-control': res.getHeader('cache-control'),
+              },
+              body,
+              expires: Date.now() + ttl * 1000,
+            });
+          } catch (err) {
+            console.error('[exoplanets proxy] cache store error', err && err.stack ? err.stack : err);
+          }
+          resolve();
+        });
+
+        upstreamRes.on('error', (err) => {
+          console.error('[exoplanets proxy] upstreamRes error', err && err.stack ? err.stack : err);
+          reject(err);
+        });
       });
-    }
 
-    console.log('[exoplanets proxy] incoming headers:', req.headers);
-    console.log(`[exoplanets proxy] ${req.method} -> ${upstreamUrl} (query length: ${qs.length})`);
-
-    // add a timeout using AbortController
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 25000);
-
-    let upstreamRes;
-    try {
-      upstreamRes = await globalThis.fetch(upstreamUrl, {
-        method: req.method,
-        headers: forwardHeaders,
-        body,
-        signal: controller.signal,
+      upstreamReq.on('timeout', () => {
+        upstreamReq.destroy(new Error('UpstreamTimeout'));
       });
-    } finally {
-      clearTimeout(timeout);
-    }
 
-    // Mirror status and headers
-    res.statusCode = upstreamRes.status;
-    const ct = upstreamRes.headers.get('content-type');
-    if (ct) res.setHeader('content-type', ct);
-    const cc = upstreamRes.headers.get('cache-control');
-    if (cc) res.setHeader('cache-control', cc);
+      upstreamReq.on('error', (err) => {
+        console.error('[exoplanets proxy] request error', err && err.stack ? err.stack : err);
+        if (!res.headersSent) res.setHeader('content-type', 'application/json');
+        if (!res.writableEnded) sendJson(res, 502, { error: 'UpstreamError', message: String(err) });
+        reject(err);
+      });
 
-    const text = await upstreamRes.text();
-
-    if (!upstreamRes.ok) {
-      // Log upstream error body to server logs to aid debugging
-      console.error('[exoplanets proxy] upstream responded with error', upstreamRes.status, text.slice(0, 2000));
-      // Forward upstream body (may be HTML or JSON) to client for diagnosis
-      return res.end(text);
-    }
-
-    return res.end(text);
+      upstreamReq.setTimeout(25000);
+      upstreamReq.end();
+    });
   } catch (err) {
-    console.error('[exoplanets proxy] error:', err);
-    res.statusCode = 500;
-    res.setHeader('content-type', 'application/json');
-    return res.end(JSON.stringify({ error: 'ProxyError', message: String(err) }));
+    console.error('[exoplanets proxy] unexpected error', err && err.stack ? err.stack : err);
+    if (!res.headersSent) res.setHeader('content-type', 'application/json');
+    return sendJson(res, 500, { error: 'ProxyError', message: String(err) });
   }
-};
+}
+
