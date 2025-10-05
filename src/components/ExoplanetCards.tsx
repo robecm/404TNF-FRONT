@@ -101,13 +101,12 @@ const ExoplanetCards: FC = () => {
         }));
         setPlanets(withImgs);
 
-        // Si estamos en producción (no localhost) evitamos hacer múltiples fetchs a la CDN
-        // para no generar 404s visibles en la consola del navegador. En ese caso usamos
-        // directamente BACKUP_IMG para todas las cards. En desarrollo seguimos prefetching
-        // para poder ver imágenes reales mientras se desarrolla.
+        // Si estamos en producción (no localhost) usamos las URLs directas de la CDN/NASA
+        // para cada planeta y dejamos que el <img> gestione el fallback si la URL falla.
+        // En desarrollo seguimos prefetching a blobs para tener control sobre las imágenes.
         const isProd = typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
         if (isProd) {
-          setImageSrcs(withImgs.map(() => BACKUP_IMG));
+          setImageSrcs(withImgs.map((p) => p.image_url ?? BACKUP_IMG));
           return;
         }
 
@@ -231,10 +230,34 @@ const ExoplanetCards: FC = () => {
               alt={e.pl_name}
               className="w-full h-40 object-cover rounded-lg mb-4 border border-slate-700/40"
               loading="lazy"
+              data-plname={e.pl_name}
+              data-plrade={String(e.pl_rade ?? '')}
+              data-plbmasse={String(e.pl_bmasse ?? '')}
+              data-trycount="0"
               onError={(ev) => {
                 const img = ev.currentTarget as HTMLImageElement;
-                // evitar reintentos hacia la CDN: asignar directamente el backup local
-                if (img.src !== BACKUP_IMG) img.src = BACKUP_IMG;
+                // si ya es el BACKUP, no reintentar
+                if (img.src === BACKUP_IMG) return;
+
+                // intentar hasta 3 variantes (cambiar índice) antes de usar BACKUP
+                const tryCount = Number(img.dataset.trycount || '0');
+                const maxAttempts = 3;
+                const plName = img.dataset.plname || '';
+                const rade = img.dataset.plrade ? Number(img.dataset.plrade) : null;
+                const bmasse = img.dataset.plbmasse ? Number(img.dataset.plbmasse) : null;
+
+                if (tryCount >= maxAttempts) {
+                  img.dataset.trycount = String(tryCount + 1);
+                  img.src = BACKUP_IMG;
+                  return;
+                }
+
+                const baseIdx = indexFromName(plName);
+                const nextIdx = ((baseIdx + tryCount) % MAX_NASA_INDEX) + 1;
+                const candidate = buildNasaImageUrl(plName, rade, bmasse, nextIdx);
+                img.dataset.trycount = String(tryCount + 1);
+                // asignar la nueva URL; onError será llamado de nuevo si falla
+                img.src = candidate;
               }}
             />
 
