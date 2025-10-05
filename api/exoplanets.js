@@ -34,14 +34,26 @@ module.exports = async (req, res) => {
       });
     }
 
-    console.log(`[exoplanets proxy] ${req.method} -> ${upstreamUrl}`);
+    console.log('[exoplanets proxy] incoming headers:', req.headers);
+    console.log(`[exoplanets proxy] ${req.method} -> ${upstreamUrl} (query length: ${qs.length})`);
 
-    const upstreamRes = await globalThis.fetch(upstreamUrl, {
-      method: req.method,
-      headers: forwardHeaders,
-      body,
-    });
+    // add a timeout using AbortController
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 25000);
 
+    let upstreamRes;
+    try {
+      upstreamRes = await globalThis.fetch(upstreamUrl, {
+        method: req.method,
+        headers: forwardHeaders,
+        body,
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    // Mirror status and headers
     res.statusCode = upstreamRes.status;
     const ct = upstreamRes.headers.get('content-type');
     if (ct) res.setHeader('content-type', ct);
@@ -49,6 +61,14 @@ module.exports = async (req, res) => {
     if (cc) res.setHeader('cache-control', cc);
 
     const text = await upstreamRes.text();
+
+    if (!upstreamRes.ok) {
+      // Log upstream error body to server logs to aid debugging
+      console.error('[exoplanets proxy] upstream responded with error', upstreamRes.status, text.slice(0, 2000));
+      // Forward upstream body (may be HTML or JSON) to client for diagnosis
+      return res.end(text);
+    }
+
     return res.end(text);
   } catch (err) {
     console.error('[exoplanets proxy] error:', err);
