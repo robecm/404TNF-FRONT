@@ -5,13 +5,7 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   server: {
-    proxy: {
-      '/api/exoplanets': {
-        target: 'https://exoplanetarchive.ipac.caltech.edu',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/exoplanets/, '/TAP/sync'),
-      },
-    },
+    // No proxy: client calls the official Exoplanet Archive API directly
   },
   optimizeDeps: {
     exclude: ['lucide-react'],

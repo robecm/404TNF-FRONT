@@ -53,16 +53,8 @@ const ExoplanetDetail: FC<{ plName?: string; onClose?: () => void }> = ({
     setError(null);
 
     const sql = `select pl_name,hostname,discoverymethod,disc_year,pl_rade,pl_bmasse,sy_dist from pscomppars where pl_name='${name}'`;
-    const buildApiUrl = (query: string) => {
-      const q = encodeURIComponent(query);
-      // Preferir proxy serverless en /api/exoplanets. Si VITE_API_BASE está configurado, usarla.
-      const meta = (import.meta as unknown as { env?: Record<string, string | undefined> })?.env;
-      const base = meta?.VITE_API_BASE || '';
-      if (base) return `${base}/api/exoplanets?query=${q}&format=json`;
-      return `/api/exoplanets?query=${q}&format=json`;
-    };
-
-    const url = buildApiUrl(sql);
+    const q = encodeURIComponent(sql);
+    const url = `https://exoplanetarchive.ipac.caltech.edu/TAP/sync?query=${q}&format=json`;
 
     fetch(url)
       .then((res) => {

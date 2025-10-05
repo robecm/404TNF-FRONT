@@ -13,24 +13,14 @@ npm run dev
 
 ## Variables de entorno
 
-La app utiliza variables de Vite (deben empezar con `VITE_`) para configurar la URL del backend en build/producción.
+La app puede consultar datos desde la API oficial del Exoplanet Archive o desde un backend propio.
 
-Archivo de ejemplo: `.env.example` (incluido en la raíz).
+- `VITE_API_BASE` (opcional): URL base de tu backend (sin `/api`). Si lo defines, algunas operaciones de carga/subida usarán esa base.
 
-- `VITE_API_BASE`: URL base del API (sin `/api`). Ejemplo:
+En este repo las llamadas de lectura de exoplanetas usan directamente la API oficial de
+`https://exoplanetarchive.ipac.caltech.edu/TAP/sync` en producción, por lo que no es necesario un proxy para las consultas de solo lectura.
 
-	VITE_API_BASE=https://api.exoptolemy.study
-
-En desarrollo puedes copiar el archivo de ejemplo:
-
-```bash
-cp .env.example .env
-# editar .env si necesitas cambiar la URL
-```
-
-En tu proveedor de hosting (Vercel, Netlify, etc.) añade `VITE_API_BASE` en las Environment Variables del proyecto antes de construir la app.
-
-Si no se define `VITE_API_BASE`, la app intentará usar la ruta relativa `/api/exoplanets` como fallback.
+Si necesitas capacidades de escritura (por ejemplo `upload`), configura `VITE_API_BASE` apuntando a tu backend que implemente los endpoints necesarios.
 
 ## Despliegue
 

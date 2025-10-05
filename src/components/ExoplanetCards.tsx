@@ -20,17 +20,12 @@ type Exoplanet = {
 const API_QUERY =
   'select top 120 pl_name,hostname,discoverymethod,disc_year,pl_rade,pl_bmasse,sy_dist from pscomppars order by disc_year desc';
 
-// Acceso seguro a import.meta.env usando optional chaining para evitar errores en runtime
-// (por ejemplo cuando import.meta.env no está disponible en el entorno de ejecución)
-const meta = (typeof import.meta !== 'undefined' ? (import.meta as unknown as { env?: Record<string, string | undefined> }) : undefined);
-const API_BASE = meta?.env?.VITE_API_BASE || '';
+// Llamamos directamente al upstream oficial
 
 function buildApiUrl(query: string) {
   const q = encodeURIComponent(query);
-  // Usar siempre el proxy serverless /api/exoplanets en producción y desarrollo
-  // Si VITE_API_BASE está configurado (por ejemplo para entornos personalizados), usarla como base
-  if (API_BASE) return `${API_BASE}/api/exoplanets?query=${q}&format=json`;
-  return `/api/exoplanets?query=${q}&format=json`;
+  // Usar siempre la API oficial del Exoplanet Archive directamente
+  return `https://exoplanetarchive.ipac.caltech.edu/TAP/sync?query=${q}&format=json`;
 }
 
 // Base de imágenes NASA
@@ -94,14 +89,9 @@ const ExoplanetCards: FC = () => {
     const attemptFetch = async () => {
       setLoading(true);
       setError(null);
-      const altUrl = `/api/exoplanets?query=${encodeURIComponent(API_QUERY)}&format=json`;
       try {
         const apiUrl = buildApiUrl(API_QUERY);
-        let res = await fetch(apiUrl);
-        if (!res.ok) {
-          // intentar URL alternativa relativa; no loguear en consola para evitar ruido en producción
-          res = await fetch(altUrl);
-        }
+        const res = await fetch(apiUrl);
         if (!res.ok) throw new Error(`Error HTTP ${res.status}`);
         const data: Exoplanet[] = await res.json();
         const withImgs = data.map((p) => ({
