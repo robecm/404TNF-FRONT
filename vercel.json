@@ -3,6 +3,10 @@
     {
       "source": "/api/exoplanets",
       "destination": "https://exoplanetarchive.ipac.caltech.edu/TAP/sync"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }
