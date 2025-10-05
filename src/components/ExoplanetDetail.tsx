@@ -54,7 +54,8 @@ const ExoplanetDetail: FC<{ plName?: string; onClose?: () => void }> = ({
 
     const sql = `select pl_name,hostname,discoverymethod,disc_year,pl_rade,pl_bmasse,sy_dist from pscomppars where pl_name='${name}'`;
     const q = encodeURIComponent(sql);
-    const url = `https://exoplanetarchive.ipac.caltech.edu/TAP/sync?query=${q}&format=json`;
+    // Llamada relativa: /api/exoplanets será proxyeada por Vite en dev y por Vercel en prod
+    const url = `/api/exoplanets?query=${q}&format=json`;
 
     fetch(url)
       .then((res) => {

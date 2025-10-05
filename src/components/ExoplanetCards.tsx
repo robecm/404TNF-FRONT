@@ -24,8 +24,9 @@ const API_QUERY =
 
 function buildApiUrl(query: string) {
   const q = encodeURIComponent(query);
-  // Usar siempre la API oficial del Exoplanet Archive directamente
-  return `https://exoplanetarchive.ipac.caltech.edu/TAP/sync?query=${q}&format=json`;
+  // Llamar a la ruta relativa /api/exoplanets; en desarrollo Vite la proxeará,
+  // en producción Vercel aplicará la rewrite definida en vercel.json.
+  return `/api/exoplanets?query=${q}&format=json`;
 }
 
 // Base de imágenes NASA
