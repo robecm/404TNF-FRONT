@@ -19,6 +19,15 @@ type Payload = {
   koi_srad?: number;
 };
 
+type StarType = {
+  id: number;
+  x: number;
+  y: number;
+  size: number;
+  duration: number;
+  delay: number;
+};
+
 const PosibleExo: FC<{ name:string }> = ({ name }) => {
   const [data, setData] = useState<Payload | null>(null);
   const [imgSrc, setImgSrc] = useState<string>('');
@@ -28,6 +37,12 @@ const PosibleExo: FC<{ name:string }> = ({ name }) => {
   const [isAudioLoading, setIsAudioLoading] = useState(false);
   const isInitialLoad = useRef(true);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  // Stars background state for subtle animated background in this page
+  const [stars, setStars] = useState<StarType[]>([]);
+  // mousePosition is represented by targetMouse and smoothedRef
+  const targetMouse = useRef({ x: 50, y: 50 });
+  const rafRef = useRef<number | null>(null);
+  const smoothedRef = useRef({ x: 50, y: 50 });
 
   useEffect(() => {
     const storageKey = `possibleExo::${name}`;
@@ -43,6 +58,65 @@ const PosibleExo: FC<{ name:string }> = ({ name }) => {
     setImgSrc(cdn);
     isInitialLoad.current = true; // Reset on name change
   }, [name]);
+
+  const handleBack = () => {
+    // Force return to local dev front-end host
+    try {
+      window.location.href = 'http://localhost:5173/posibleExo/';
+    } catch {
+      // fallback
+      window.location.href = '/';
+    }
+  };
+
+  // generate stars & parallax behavior
+  useEffect(() => {
+    let mounted = true;
+      const createStars = () => {
+        const s: StarType[] = [];
+        for (let i = 0; i < 100; i++) {
+        s.push({
+          id: i,
+          x: Math.random() * 100,
+          y: Math.random() * 100,
+          size: Math.random() * 3 + 1,
+          duration: Math.random() * 6 + 4,
+          delay: Math.random() * 3,
+        });
+      }
+      return s;
+    };
+
+    if (mounted) setStars(createStars());
+
+    const handleMouse = (e: MouseEvent) => {
+  const x = (e.clientX / window.innerWidth) * 100;
+  const y = (e.clientY / window.innerHeight) * 100;
+  targetMouse.current = { x, y };
+      // start RAF loop if not running
+      if (rafRef.current == null) {
+        const loop = () => {
+          const cur = smoothedRef.current;
+          // lerp towards target
+          const nx = cur.x + (targetMouse.current.x - cur.x) * 0.12;
+          const ny = cur.y + (targetMouse.current.y - cur.y) * 0.12;
+          smoothedRef.current = { x: nx, y: ny };
+          rafRef.current = requestAnimationFrame(loop);
+        };
+        rafRef.current = requestAnimationFrame(loop);
+      }
+    };
+
+    window.addEventListener('mousemove', handleMouse);
+    return () => {
+      mounted = false;
+      window.removeEventListener('mousemove', handleMouse);
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const run = async () => {
@@ -190,9 +264,44 @@ ${jsonDataString}
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-black via-indigo-950 to-purple-950 text-white p-8">
-      <div className="max-w-4xl mx-auto bg-slate-900/40 p-6 rounded-lg border border-slate-700">
-        <h2 className="text-3xl font-bold mb-4">Posible Exoplaneta: {decodeURIComponent(name)}</h2>
+    <div className="relative min-h-screen bg-gradient-to-b from-black via-indigo-950 to-purple-950 text-white p-8">
+      {/* Animated Stars (copied from App.tsx) */}
+  <div className={`fixed inset-0 pointer-events-none flex items-center justify-center transition-opacity duration-1000 opacity-100`}>
+        {stars.map((star) => {
+          const centerX = 50;
+          const centerY = 50;
+          const txStart = `${(star.x - centerX) * 10}px`;
+          const tyStart = `${(star.y - centerY) * 10}px`;
+
+          const mp = smoothedRef.current;
+          const parallaxX = (mp.x - 50) * (star.size / 10) * 0.5;
+          const parallaxY = (mp.y - 50) * (star.size / 10) * 0.5;
+
+          return (
+            <div
+              key={star.id}
+              className="absolute rounded-full bg-white star-zoom shadow-lg shadow-white/50 transition-transform duration-300 ease-out"
+              style={{
+                width: `${star.size}px`,
+                height: `${star.size}px`,
+                animationDuration: `${star.duration}s`,
+                animationDelay: `${star.delay}s`,
+                transform: `translate(${parallaxX}px, ${parallaxY}px)`,
+                // @ts-expect-error allow custom css variables
+                '--tx-start': txStart,
+                '--ty-start': tyStart,
+              }}
+            />
+          );
+        })}
+      </div>
+  <div className="relative z-10 max-w-4xl mx-auto bg-slate-900/40 p-6 rounded-lg border border-slate-700">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-3xl font-bold flex-1 text-left">Posible Exoplaneta: {decodeURIComponent(name)}</h2>
+          <button onClick={handleBack} className="inline-flex items-center gap-2 px-3 py-1 rounded bg-slate-800/60 hover:bg-slate-800/80 text-sm text-slate-200">
+            ← Volver
+          </button>
+        </div>
         <div className="flex flex-col md:flex-row gap-6">
           <div className="w-full md:w-1/3 flex justify-center">
             <img src={imgSrc} alt="Exoplaneta" className="w-48 h-48 object-contain rounded-lg shadow-xl" />
