@@ -49,16 +49,15 @@ const PosibleExo: FC<{ name: string }> = ({ name }) => {
       setInlineLoading(false);
     }
   };
-  const [classification, setClassification] = useState<'candidato' | 'falso' | null>('candidato');
-  const [displayProbs, setDisplayProbs] = useState<{ exoplanet: number; falsePositive: number }>({ exoplanet: 0, falsePositive: 0 });
-  const [predicting, setPredicting] = useState(false);
-  const [prediction, setPrediction] = useState<{ veredicto: string; confianza: number } | null>(null);
+  // classification state removed (UI simplified)
+  // displayProbs and heuristic removed — we rely on server prediction only
+  // prediction: normalized to { verdict, confidence }
+  const [prediction, setPrediction] = useState<{ verdict: string; confidence: number } | null>(null);
 
   // componente LocalGeminiChat eliminado: el chat fijo modal se ha quitado por petición del usuario
 
   useEffect(() => {
-    const slug = encodeURIComponent(name);
-    const storageKey = `possibleExo::${slug}`;
+    const storageKey = `possibleExo::${name}`;
     let parsed: Payload | null = null;
     try {
       const raw = sessionStorage.getItem(storageKey) || sessionStorage.getItem('possibleExo');
@@ -76,10 +75,9 @@ const PosibleExo: FC<{ name: string }> = ({ name }) => {
   useEffect(() => {
     const run = async () => {
       if (!data) return;
-      setPrediction(null);
-      setPredicting(true);
+  setPrediction(null);
       try {
-        const res = await fetch('/api/predict', {
+        const res = await fetch('https://back-557899680969.us-south1.run.app/predict', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -107,47 +105,25 @@ const PosibleExo: FC<{ name: string }> = ({ name }) => {
           }
           console.error('Predict upstream error', res.status, bodyText);
           // store a minimal marker in the UI but keep detailed info in console
-          setPrediction({ veredicto: 'ERROR', confianza: 0 });
+          setPrediction({ verdict: 'ERROR', confidence: 0 });
         } else {
           const json = await res.json();
-          // expect { veredicto: string, confianza: number }
-          setPrediction({ veredicto: String(json.veredicto ?? 'UNKNOWN'), confianza: Number(json.confianza ?? 0) });
+          // accept both {verdict,confidence} and legacy {veredicto,confianza}
+          const verdict = String(json.verdict ?? json.veredicto ?? 'UNKNOWN');
+          const confidence = Number(json.confidence ?? json.confianza ?? 0) || 0;
+          setPrediction({ verdict, confidence });
         }
       } catch (e) {
         console.error('Predict fetch error', e);
-        setPrediction({ veredicto: 'ERROR', confianza: 0 });
+        setPrediction({ verdict: 'ERROR', confidence: 0 });
       } finally {
-        setPredicting(false);
+        // finished
       }
     };
     void run();
   }, [data]);
 
-  // calcula probabilidades simples (heurística ligera) a partir de los campos disponibles
-  const computeProbabilities = (p: Payload | null) => {
-    if (!p) return { exoplanet: 50, falsePositive: 50 };
-    const snr = typeof p.koi_model_snr === 'number' ? p.koi_model_snr : 7;
-    const prad = typeof p.koi_prad === 'number' ? p.koi_prad : 1.5;
-    // transformar SNR a [0,1] con una logística centrada en 7
-    const s = 1 / (1 + Math.exp(-(snr - 7) / 3));
-    // tamaño "ideal" cerca de 1.5 R⊕ aumenta probabilidad
-    const sizeScore = Math.exp(-Math.abs((prad - 1.5) / 1.5));
-    let exo = s * 0.7 + sizeScore * 0.3;
-    exo = Math.max(0, Math.min(1, exo));
-    const exPct = Math.round(exo * 100);
-    return { exoplanet: exPct, falsePositive: 100 - exPct };
-  };
-
-  // actualizar probabilidades cuando cambian los datos
-  useEffect(() => {
-    const newProbs = computeProbabilities(data);
-    // animación: reiniciar a 0 y después establecer el valor real para que la barra haga la transición
-    setDisplayProbs({ exoplanet: 0, falsePositive: 0 });
-    const t = setTimeout(() => setDisplayProbs(newProbs), 80);
-    return () => clearTimeout(t);
-  }, [data]);
-
-  // (Se eliminó la puntuación heurística por decisión del usuario)
+  // (Se eliminó la puntuación heurística y la visualización local por petición del usuario)
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-black via-indigo-950 to-purple-950 text-white p-8">
@@ -168,7 +144,6 @@ const PosibleExo: FC<{ name: string }> = ({ name }) => {
                   <p><strong>koi_duration:</strong> {data.koi_duration} <span className="text-slate-400">horas</span></p>
                   {data.koi_period !== undefined && <p><strong>koi_period:</strong> {data.koi_period} <span className="text-slate-400">días</span></p>}
                 </div>
-
                 <div className="space-y-2">
                   {data.koi_time0bk !== undefined && <p><strong>koi_time0bk:</strong> {data.koi_time0bk} <span className="text-slate-400">(BKJD)</span></p>}
                   {data.koi_teq !== undefined && <p><strong>koi_teq:</strong> {data.koi_teq} <span className="text-slate-400">K</span></p>}
@@ -184,106 +159,30 @@ const PosibleExo: FC<{ name: string }> = ({ name }) => {
           </div>
         </div>
       </div>
-        {/* Prediction cards: clasificación y gráfica */}
-        <div className="max-w-4xl mx-auto mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700">
-            <h3 className="text-lg font-semibold mb-2">Opciones</h3>
-            <p className="text-sm text-slate-300 mb-3">Marca si crees que este objeto es un candidato o un falso positivo.</p>
-            <div className="flex items-center gap-3">
-              <label className={`px-3 py-2 rounded cursor-pointer ${classification === 'candidato' ? 'bg-cyan-600 text-black' : 'bg-slate-800 text-slate-200'}`}>
-                <input className="hidden" type="radio" name="classification" value="candidato" checked={classification === 'candidato'} onChange={() => setClassification('candidato')} />
-                Candidato
-              </label>
-              <label className={`px-3 py-2 rounded cursor-pointer ${classification === 'falso' ? 'bg-rose-600 text-black' : 'bg-slate-800 text-slate-200'}`}>
-                <input className="hidden" type="radio" name="classification" value="falso" checked={classification === 'falso'} onChange={() => setClassification('falso')} />
-                Falso positivo
-              </label>
-            </div>
-            <p className="mt-3 text-xs text-slate-400">Esto no cambia los datos del servidor; solo es una etiqueta local para tu revisión.</p>
-          </div>
 
-          <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700">
-            <h3 className="text-lg font-semibold mb-2">Probabilidad del Modelo</h3>
-            <p className="text-sm text-slate-300 mb-3">Estimación local (heurística) de la probabilidad de que sea un exoplaneta vs falso positivo.</p>
-
-            <div className="flex items-center gap-4">
-              {/* Pie / donut chart */}
-              <div className="flex-shrink-0">
-                {(() => {
-                  const pct = classification === 'falso' ? displayProbs.falsePositive : displayProbs.exoplanet;
-                  const size = 96;
-                  const stroke = 12;
-                  const radius = (size - stroke) / 2;
-                  const cx = size / 2;
-                  const cy = size / 2;
-                  const circumference = 2 * Math.PI * radius;
-                  const offset = circumference * (1 - (pct / 100));
-                  const color = classification === 'falso' ? '#fb7185' : '#06b6d4'; // rose-400 or cyan-400
-                  return (
-                    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="false" role="img">
-                      <defs>
-                        <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
-                          <feDropShadow dx="0" dy="2" stdDeviation="2" floodColor="#000" floodOpacity="0.4" />
-                        </filter>
-                      </defs>
-                      {/* background circle */}
-                      <circle cx={cx} cy={cy} r={radius} stroke="#0f172a" strokeWidth={stroke} fill="none" />
-                      {/* progress arc */}
-                      <circle
-                        cx={cx}
-                        cy={cy}
-                        r={radius}
-                        stroke={color}
-                        strokeWidth={stroke}
-                        strokeLinecap="round"
-                        fill="none"
-                        strokeDasharray={circumference}
-                        strokeDashoffset={offset}
-                        style={{ transition: 'stroke-dashoffset 800ms ease' }}
-                        transform={`rotate(-90 ${cx} ${cy})`}
-                        filter="url(#shadow)"
-                      />
-                      {/* inner circle to create donut */}
-                      <circle cx={cx} cy={cy} r={radius - stroke / 2} fill="rgba(2,6,23,0.6)" />
-                      {/* center text */}
-                      <text x="50%" y="48%" dominantBaseline="middle" textAnchor="middle" fontSize="16" fill="#ffffff" style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, monospace' }}>
-                        {pct}%
-                      </text>
-                      <text x="50%" y="66%" dominantBaseline="middle" textAnchor="middle" fontSize="10" fill="#ffffff" style={{ fontFamily: 'Inter, ui-sans-serif, system-ui, -apple-system' }}>
-                        {classification === 'falso' ? 'Falso positivo' : 'Exoplaneta'}
-                      </text>
-                    </svg>
-                  );
-                })()}
-              </div>
-
-              <div className="flex-1">
-                <div className="text-sm mb-1">Porcentaje mostrado para la clase seleccionada:</div>
-                <div className="text-xs text-slate-400">Actualizado localmente cuando se carga la página. Cambia la opción para ver la clase correspondiente.</div>
-              </div>
-            </div>
-            {/* Prediction result from model backend */}
-            <div className="mt-4">
-              {predicting && <div className="text-sm text-slate-400">Obteniendo predicción del modelo...</div>}
-              {prediction && (
-                <div className="mt-2 p-3 bg-slate-800/60 rounded">
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm">Veredicto del modelo</div>
-                    <div className={`font-semibold ${prediction.veredicto.toLowerCase().includes('false') ? 'text-rose-400' : 'text-cyan-300'}`}>{prediction.veredicto}</div>
-                  </div>
-                  <div className="mt-1 flex items-center gap-3">
-                    <div className="text-xs text-slate-400">Confianza</div>
-                    <div className="font-mono">{Math.round(prediction.confianza * 100)}%</div>
-                    <div className="flex-1 bg-slate-700 rounded h-2 overflow-hidden">
-                      <div className="h-2 bg-cyan-500" style={{ width: `${Math.round(prediction.confianza * 100)}%` }} />
-                    </div>
+      {/* Prediction card (server result) */}
+      <div className="max-w-4xl mx-auto mt-6">
+        <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700">
+          {prediction && (
+            <div className="mt-0 p-0">
+              <div className="mt-0 p-3 bg-slate-800/60 rounded border border-slate-700">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm">Resultado del servidor</div>
+                  <div className={`font-semibold ${(() => { const v = prediction.verdict.toLowerCase(); return v.includes('false') || v.includes('false positive') ? 'text-rose-400' : 'text-cyan-300'; })()}`}>{prediction.verdict}</div>
+                </div>
+                <div className="mt-2 flex items-center gap-3">
+                  <div className="text-xs text-slate-400">Confianza</div>
+                  <div className="font-mono">{Math.round((prediction.confidence || 0) * 100)}%</div>
+                  <div className="flex-1 bg-slate-700 rounded h-2 overflow-hidden">
+                    <div className="h-2 bg-cyan-500" style={{ width: `${Math.max(0, Math.min(100, (prediction.confidence || 0) * 100))}%`, transition: 'width 600ms ease' }} />
                   </div>
                 </div>
-              )}
+                <div className="mt-3 text-xs text-slate-400">Etiqueta sugerida: <span className="font-medium">{prediction.verdict.toLowerCase().includes('false') ? 'Falso positivo' : 'Exoplaneta'}</span></div>
+              </div>
             </div>
-          </div>
+          )}
         </div>
-  {/* Chat local fijo eliminado */}
+      </div>
 
       {/* Inline prompt similar a ChatGPT al final de la página */}
       <div className="max-w-4xl mx-auto mt-6">
