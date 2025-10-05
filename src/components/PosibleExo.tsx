@@ -1,4 +1,9 @@
-import { FC, useEffect, useState } from 'react';
+import { FC, useEffect, useRef, useState } from 'react';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+
+// IMPORTANT: Store your API key in a .env.local file at the project root
+// VITE_GEMINI_API_KEY="YOUR_API_KEY_HERE"
+const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
 
 type Payload = {
   koi_prad: number;
@@ -15,46 +20,13 @@ type Payload = {
   koi_srad?: number;
 };
 
-const PosibleExo: FC<{ name: string }> = ({ name }) => {
+const PosibleExo: FC<{ name:string }> = ({ name }) => {
   const [data, setData] = useState<Payload | null>(null);
   const [imgSrc, setImgSrc] = useState<string>('');
-  // el chat local se muestra siempre en esta página (sin botón flotante)
-  // inline chat at bottom of PosibleExo
-  const [inlineMessages, setInlineMessages] = useState<Array<{ id: string; role: 'user' | 'assistant'; text: string }>>([]);
-  const [inlineInput, setInlineInput] = useState('');
-  const [inlineLoading, setInlineLoading] = useState(false);
-
-  const sendInline = async () => {
-    const text = inlineInput.trim();
-    if (!text) return;
-    const user = { id: 'u' + Date.now(), role: 'user' as const, text };
-    setInlineMessages((s) => [...s, user]);
-    setInlineInput('');
-    setInlineLoading(true);
-    try {
-      const res = await fetch('/api/gemini', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: text }),
-      });
-      if (!res.ok) {
-        setInlineMessages((s) => [...s, { id: 'a' + Date.now(), role: 'assistant', text: 'No se pudo contactar al proxy de Gemini. Respuesta simulada.' }]);
-      } else {
-        const json = await res.json();
-        setInlineMessages((s) => [...s, { id: 'a' + Date.now(), role: 'assistant', text: json.reply ?? 'Respuesta inesperada del proxy.' }]);
-      }
-    } catch {
-      setInlineMessages((s) => [...s, { id: 'a' + Date.now(), role: 'assistant', text: 'Error de red al contactar al proxy. Configure un endpoint /api/gemini en su servidor.' }]);
-    } finally {
-      setInlineLoading(false);
-    }
-  };
-  // classification state removed (UI simplified)
-  // displayProbs and heuristic removed — we rely on server prediction only
-  // prediction: normalized to { verdict, confidence }
   const [prediction, setPrediction] = useState<{ verdict: string; confidence: number } | null>(null);
-
-  // componente LocalGeminiChat eliminado: el chat fijo modal se ha quitado por petición del usuario
+  const [geminiSummary, setGeminiSummary] = useState<string>('');
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const isInitialLoad = useRef(true);
 
   useEffect(() => {
     const storageKey = `possibleExo::${name}`;
@@ -66,16 +38,17 @@ const PosibleExo: FC<{ name: string }> = ({ name }) => {
       // ignore
     }
     setData(parsed);
-    // usar CDN público por default
     const cdn = 'https://cdn.pixabay.com/photo/2024/09/23/08/48/planet-9068292_960_720.png';
     setImgSrc(cdn);
+    isInitialLoad.current = true; // Reset on name change
   }, [name]);
 
-  // cuando haya data (payload) pedir la prediccion al backend proxy
   useEffect(() => {
     const run = async () => {
-      if (!data) return;
-  setPrediction(null);
+      if (!data) {
+        setPrediction(null);
+        return;
+      }
       try {
         const res = await fetch('https://back-557899680969.us-south1.run.app/predict', {
           method: 'POST',
@@ -96,7 +69,6 @@ const PosibleExo: FC<{ name: string }> = ({ name }) => {
           }),
         });
         if (!res.ok) {
-          // attempt to read response body for diagnostics
           let bodyText = '';
           try {
             bodyText = await res.text();
@@ -104,11 +76,9 @@ const PosibleExo: FC<{ name: string }> = ({ name }) => {
             bodyText = '<unable to read body>';
           }
           console.error('Predict upstream error', res.status, bodyText);
-          // store a minimal marker in the UI but keep detailed info in console
           setPrediction({ verdict: 'ERROR', confidence: 0 });
         } else {
           const json = await res.json();
-          // accept both {verdict,confidence} and legacy {veredicto,confianza}
           const verdict = String(json.verdict ?? json.veredicto ?? 'UNKNOWN');
           const confidence = Number(json.confidence ?? json.confianza ?? 0) || 0;
           setPrediction({ verdict, confidence });
@@ -116,14 +86,52 @@ const PosibleExo: FC<{ name: string }> = ({ name }) => {
       } catch (e) {
         console.error('Predict fetch error', e);
         setPrediction({ verdict: 'ERROR', confidence: 0 });
-      } finally {
-        // finished
       }
     };
     void run();
   }, [data]);
 
-  // (Se eliminó la puntuación heurística y la visualización local por petición del usuario)
+  useEffect(() => {
+    const fetchSummary = async () => {
+      if (!data || !prediction || prediction.verdict === 'ERROR' || !isInitialLoad.current) return;
+
+      isInitialLoad.current = false; // Mark as loaded
+      setSummaryLoading(true);
+      setGeminiSummary('');
+
+      const combinedData = {
+        candidate_name: decodeURIComponent(name),
+        planetary_data: data,
+        model_prediction: prediction,
+      };
+      const jsonDataString = JSON.stringify(combinedData, null, 2);
+
+      const prompt = `
+Por favor analiza la siguiente informacion JSON. Contiene datos planetarios (como koi_prad, koi_teq, etc.) sobre un candidato a exoplaneta y la predicción de un modelo sobre si es un exoplaneta real.
+Tu tarea es traducir estos datos tecnicos en un resumen simple y facil de entender para una persona sin conocimientos tecnicos.
+Considera todos los datos planetarios proporcionados y el veredicto del modelo para explicar los hallazgos clave.
+Sé conciso y claro, explicando los hallazgos de manera atractiva en un sólo párrafo. Incluye únicamente el párrafo que me darás de respuesta, ningún texto más.
+
+Aquí están los datos:
+${jsonDataString}
+`;
+
+      try {
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+        const result = await model.generateContent(prompt);
+        const response = result.response;
+        const text = response.text();
+        setGeminiSummary(text);
+      } catch (error) {
+        console.error('Error fetching summary from Gemini:', error);
+        setGeminiSummary('Error al generar el resumen desde la API de Gemini.');
+      } finally {
+        setSummaryLoading(false);
+      }
+    };
+
+    void fetchSummary();
+  }, [data, prediction, name]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-black via-indigo-950 to-purple-950 text-white p-8">
@@ -184,34 +192,17 @@ const PosibleExo: FC<{ name: string }> = ({ name }) => {
         </div>
       </div>
 
-      {/* Inline prompt similar a ChatGPT al final de la página */}
-      <div className="max-w-4xl mx-auto mt-6">
-        <div className="bg-slate-900/40 p-4 rounded-lg border border-slate-700">
-          <h4 className="text-sm font-semibold mb-2">Preguntar sobre este objeto</h4>
-          <div className="mb-3 max-h-40 overflow-y-auto space-y-2" aria-live="polite">
-            {inlineMessages.length === 0 && <div className="text-xs text-slate-400">Haz una pregunta y Gemini responderá aquí.</div>}
-            {inlineMessages.map((m) => (
-              <div key={m.id} className={`${m.role === 'user' ? 'text-right' : 'text-left'}`}>
-                <div className={`${m.role === 'user' ? 'bg-cyan-600 text-black inline-block' : 'bg-slate-700 text-slate-100 inline-block'} px-3 py-2 rounded`}>{m.text}</div>
-              </div>
-            ))}
-          </div>
-
-          <div className="flex items-center gap-2">
-            <input
-              value={inlineInput}
-              onChange={(e) => setInlineInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') sendInline(); }}
-              className="flex-1 px-3 py-2 rounded bg-slate-900 text-white text-sm"
-              placeholder="Escribe tu pregunta (ej. ¿Qué significa koi_teq?)"
-              aria-label="Pregunta a Gemini"
-            />
-            <button onClick={() => sendInline()} disabled={inlineLoading || !inlineInput.trim()} className="px-3 py-2 bg-cyan-600 rounded text-black text-sm">
-              {inlineLoading ? '...' : 'Enviar'}
-            </button>
+      {/* Gemini Summary Card */}
+      {(summaryLoading || geminiSummary) && (
+        <div className="max-w-4xl mx-auto mt-6">
+          <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700">
+            <h4 className="text-sm font-semibold mb-2 text-cyan-300">Resumen de Gemini</h4>
+            {summaryLoading && <div className="text-sm text-slate-400">Generando resumen...</div>}
+            {geminiSummary && <p className="text-sm text-slate-200 leading-relaxed">{geminiSummary}</p>}
           </div>
         </div>
-      </div>
+      )}
+
     </div>
   );
 };
