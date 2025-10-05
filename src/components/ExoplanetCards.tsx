@@ -18,9 +18,10 @@ type Exoplanet = {
 const API_QUERY =
   'select top 12 pl_name,hostname,discoverymethod,disc_year,pl_rade,pl_bmasse,sy_dist from pscomppars order by disc_year desc';
 
-// Acceso seguro a import.meta.env sin usar `any` explícito
-const env = (import.meta as unknown) as { env: Record<string, string | undefined> };
-const API_BASE = env.env.VITE_API_BASE || '';
+// Acceso seguro a import.meta.env usando optional chaining para evitar errores en runtime
+// (por ejemplo cuando import.meta.env no está disponible en el entorno de ejecución)
+const meta = (typeof import.meta !== 'undefined' ? (import.meta as unknown as { env?: Record<string, string | undefined> }) : undefined);
+const API_BASE = meta?.env?.VITE_API_BASE || '';
 const API_URL = `${API_BASE}/api/exoplanets?query=${encodeURIComponent(API_QUERY)}&format=json`;
 
 // Base de imágenes NASA
@@ -48,7 +49,9 @@ function classifyPlanetType(rade: number | null, bmasse: number | null): string 
 }
 
 /** Crea índice estable para distribuir imágenes */
-function indexFromName(name: string, max = 12): number {
+// Reducimos el rango a 8 para disminuir peticiones a archivos que no existen en el CDN
+const MAX_NASA_INDEX = 8;
+function indexFromName(name: string, max = MAX_NASA_INDEX): number {
   let h = 0;
   for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
   return (h % max) + 1;
@@ -58,18 +61,23 @@ function indexFromName(name: string, max = 12): number {
 function buildNasaImageUrl(
   plName: string,
   rade: number | null,
-  bmasse: number | null
+  bmasse: number | null,
+  idxOverride?: number
 ): string {
   const type = classifyPlanetType(rade, bmasse);
-  const idx = indexFromName(plName, 12);
+  const idx = idxOverride ?? indexFromName(plName);
   const params = "fit=clip&crop=faces%2Cfocalpoint&w=300";
   return `${NASA_IMG_BASE}/${type}-${idx}.jpg?${params}`;
 }
+
+// Cache en memoria de URLs que dieron 404 para no reintentarlas en la misma sesión
+const failedImageUrls = new Set<string>();
 
 const ExoplanetCards: FC = () => {
   const [planets, setPlanets] = useState<Exoplanet[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [imageSrcs, setImageSrcs] = useState<string[]>([]);
 
   useEffect(() => {
     const attemptFetch = async () => {
@@ -79,8 +87,7 @@ const ExoplanetCards: FC = () => {
       try {
         let res = await fetch(API_URL);
         if (!res.ok) {
-          // intentar URL alternativa relativa
-          console.warn('[ExoplanetCards] primary API failed, trying altUrl', API_URL, res.status);
+          // intentar URL alternativa relativa; no loguear en consola para evitar ruido en producción
           res = await fetch(altUrl);
         }
         if (!res.ok) throw new Error(`Error HTTP ${res.status}`);
@@ -90,6 +97,55 @@ const ExoplanetCards: FC = () => {
           image_url: buildNasaImageUrl(p.pl_name, p.pl_rade, p.pl_bmasse),
         }));
         setPlanets(withImgs);
+
+        // Si estamos en producción (no localhost) evitamos hacer múltiples fetchs a la CDN
+        // para no generar 404s visibles en la consola del navegador. En ese caso usamos
+        // directamente BACKUP_IMG para todas las cards. En desarrollo seguimos prefetching
+        // para poder ver imágenes reales mientras se desarrolla.
+        const isProd = typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+        if (isProd) {
+          setImageSrcs(withImgs.map(() => BACKUP_IMG));
+          return;
+        }
+
+        // Prefetch images as blobs to avoid browser 404s (only in development)
+        const createdBlobs: string[] = [];
+        const fetchImageFor = async (p: Exoplanet): Promise<string> => {
+          const attempts = 3;
+          const baseIdx = indexFromName(p.pl_name);
+          for (let t = 0; t < attempts; t++) {
+            const nextIdx = ((baseIdx + t) % MAX_NASA_INDEX) + 1;
+            const candidate = buildNasaImageUrl(p.pl_name, p.pl_rade, p.pl_bmasse, nextIdx);
+            if (failedImageUrls.has(candidate)) continue;
+            try {
+              const res = await fetch(candidate);
+              if (!res.ok) {
+                failedImageUrls.add(candidate);
+                continue;
+              }
+              const blob = await res.blob();
+              const blobUrl = URL.createObjectURL(blob);
+              createdBlobs.push(blobUrl);
+              return blobUrl;
+            } catch {
+              failedImageUrls.add(candidate);
+              continue;
+            }
+          }
+          return BACKUP_IMG;
+        };
+        
+
+        let mounted = true;
+        Promise.all(withImgs.map((p) => fetchImageFor(p))).then((srcs) => {
+          if (mounted) setImageSrcs(srcs);
+        });
+
+        // cleanup: revocar blobs creados cuando el componente se desmonte o los datos cambien
+        return () => {
+          mounted = false;
+          createdBlobs.forEach((b) => URL.revokeObjectURL(b));
+        };
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         setError(msg);
@@ -119,15 +175,17 @@ const ExoplanetCards: FC = () => {
             data-index={idx}
             className="bg-gradient-to-br from-black/40 to-slate-900/40 backdrop-blur-md rounded-xl p-6 border border-slate-600/30 hover:scale-[1.02] transition-transform"
           >
-            {/* Imagen NASA dinámica (con fallback seguro) */}
+            {/* Imagen NASA dinámica (prefetched blob o fallback) */}
             <img
-              src={e.image_url || BACKUP_IMG}
+              src={imageSrcs[idx] || BACKUP_IMG}
               alt={e.pl_name}
-              onError={(ev) => {
-                ev.currentTarget.src = BACKUP_IMG;
-              }}
               className="w-full h-40 object-cover rounded-lg mb-4 border border-slate-700/40"
               loading="lazy"
+              onError={(ev) => {
+                const img = ev.currentTarget as HTMLImageElement;
+                // evitar reintentos hacia la CDN: asignar directamente el backup local
+                if (img.src !== BACKUP_IMG) img.src = BACKUP_IMG;
+              }}
             />
 
             <div className="flex items-center gap-4 mb-3">

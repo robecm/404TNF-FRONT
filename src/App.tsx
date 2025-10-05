@@ -21,14 +21,66 @@ function App() {
   const [mousePosition, setMousePosition] = useState({ x: 50, y: 50 });
   const [routePlanet, setRoutePlanet] = useState<string | null>(null);
   const hadDetailRef = useRef(false);
+  const [exoplanetImgSrc, setExoplanetImgSrc] = useState<string>('');
+
+  useEffect(() => {
+    let mounted = true;
+    const localPath = `${import.meta.env.BASE_URL || '/'}src/static/exoplanet.png`;
+    const nasaBackup = 'https://assets.science.nasa.gov/dynamicimage/assets/science/astro/exo-explore/assets/content/planets/neptunelike-8.jpg?fit=clip&crop=faces%2Cfocalpoint&w=300';
+
+    // Bundled asset URL (pacquetizado por Vite). Se usa como último recurso y no genera 404s externos.
+    const bundledLocal = new URL('./static/exoplanet.png', import.meta.url).href;
+
+    let createdBlobUrl: string | null = null;
+    (async () => {
+      try {
+        // 1) Intentar cargar la imagen local (posible ruta pública)
+        const resLocal = await fetch(localPath);
+        if (resLocal.ok) {
+          const blob = await resLocal.blob();
+          if (!mounted) return;
+          createdBlobUrl = URL.createObjectURL(blob);
+          setExoplanetImgSrc(createdBlobUrl);
+          return;
+        }
+
+        // 2) Si falla, intentar obtener la imagen desde la CDN de la NASA mediante fetch.
+        // Hacemos fetch explícito para que, si responde 404, lo manejemos sin asignar la URL
+        // directamente al <img> (evita que el navegador haga la petición y muestre 404 en consola).
+        try {
+          const resNasa = await fetch(nasaBackup);
+          if (resNasa.ok) {
+            const blob = await resNasa.blob();
+            if (!mounted) return;
+            createdBlobUrl = URL.createObjectURL(blob);
+            setExoplanetImgSrc(createdBlobUrl);
+            return;
+          }
+        } catch {
+          // ignorar errores de fetch a NASA; caeremos al fallback empaquetado
+        }
+
+        // 3) Fallback final: usar la imagen empaquetada (no genera peticiones externas que puedan 404)
+        if (!mounted) return;
+        setExoplanetImgSrc(bundledLocal);
+      } catch {
+        if (!mounted) return;
+        setExoplanetImgSrc(bundledLocal);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+      if (createdBlobUrl) URL.revokeObjectURL(createdBlobUrl);
+    };
+  }, []);
 
   useEffect(() => {
     // Listen for history navigation to show detail pages under /exoplaneta/:name
     // We want to distinguish initial load (no popstate event) from user navigation
     const checkRoute = (ev?: PopStateEvent) => {
       const p = window.location.pathname;
-      // console.debug para depuración
-      console.debug('[checkRoute] pop?', !!ev, 'path=', p);
+  // depuración: checkRoute invoked (silenciado en producción)
       if (p.startsWith('/exoplaneta/')) {
         setRoutePlanet(decodeURIComponent(p.replace('/exoplaneta/', '')));
       } else {
@@ -52,7 +104,6 @@ function App() {
   // y la ruta resultante es '/', aseguramos que se muestre la pantalla de 'journey'
   useEffect(() => {
     const onPopShowJourney = () => {
-      console.debug('[onPopShowJourney] path=', window.location.pathname);
       if (window.location.pathname === '/') setShowJourneyCards(true);
     };
     window.addEventListener('popstate', onPopShowJourney);
@@ -65,7 +116,6 @@ function App() {
     if (routePlanet) {
       hadDetailRef.current = true;
     } else if (hadDetailRef.current && !routePlanet) {
-      console.debug('[routePlanet effect] returning from detail, show journey');
       setShowJourneyCards(true);
       hadDetailRef.current = false;
     }
@@ -270,13 +320,8 @@ function App() {
             {/* Imagen central de exoplaneta */}
             <div className="w-full flex justify-center mb-12">
               <img
-                src={`${import.meta.env.BASE_URL || '/'}src/static/exoplanet.png`}
+                src={exoplanetImgSrc || `${import.meta.env.BASE_URL || '/'}src/static/exoplanet.png`}
                 alt="Exoplaneta"
-                onError={(ev) => {
-                  // fallback a imagen pública si la local no existe en producción
-                  ev.currentTarget.onerror = null;
-                  ev.currentTarget.src = 'https://assets.science.nasa.gov/dynamicimage/assets/science/astro/exo-explore/assets/content/planets/neptunelike-8.jpg?fit=clip&crop=faces%2Cfocalpoint&w=300';
-                }}
                 className="w-40 md:w-56 lg:w-72 rounded-lg shadow-2xl object-contain animate-fade-in"
               />
             </div>
