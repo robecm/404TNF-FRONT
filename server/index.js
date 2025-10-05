@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /**
- * Simple Gemini proxy server.
+ * Simple Gemini proxy server (ESM).
  * - Reads GEMINI_API_KEY and GEMINI_API_ENDPOINT from process.env (use .env for local dev)
  * - Exposes POST /api/gemini { prompt }
  * - Forwards the prompt to GEMINI_API_ENDPOINT with Authorization: Bearer <GEMINI_API_KEY>
  * If GEMINI_API_ENDPOINT is not configured, returns 501 with instructions.
  */
-const express = require('express');
-const dotenv = require('dotenv');
+import express from 'express';
+import dotenv from 'dotenv';
 
 // load .env in development
 dotenv.config();
@@ -52,6 +52,41 @@ app.post('/api/gemini', async (req, res) => {
     return res.json({ reply });
   } catch (err) {
     console.error('Error proxying to Gemini', err);
+    return res.status(500).json({ error: 'Proxy error', detail: String(err) });
+  }
+});
+
+// Simple predict proxy for local development. Mirrors /api/predict serverless function behavior.
+app.post('/api/predict', async (req, res) => {
+  const body = req.body ?? {};
+  const DEFAULT_PREDICT = 'https://back-557899680969.us-south1.run.app/predict/';
+  const endpoint = process.env.PREDICT_ENDPOINT || DEFAULT_PREDICT;
+
+  console.log('[local proxy] /api/predict ->', endpoint);
+  console.log('[local proxy] body:', JSON.stringify(body));
+
+  try {
+    const upstreamRes = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    const text = await upstreamRes.text();
+    if (!upstreamRes.ok) {
+      console.error('[local proxy] predict upstream error', upstreamRes.status, text);
+      return res.status(502).json({ error: 'Upstream predict error', status: upstreamRes.status, body: text });
+    }
+
+    // try parse JSON, otherwise forward as text
+    try {
+      const j = JSON.parse(text);
+      return res.json(j);
+    } catch {
+      return res.send(text);
+    }
+  } catch (err) {
+    console.error('[local proxy] predict proxy error', err);
     return res.status(500).json({ error: 'Proxy error', detail: String(err) });
   }
 });

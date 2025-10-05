@@ -13,6 +13,18 @@ export default defineConfig({
         secure: true,
         rewrite: (path) => path.replace(/^\/api\/exoplanets/, '/TAP/sync'),
       },
+      // Proxy /api/gemini to the local proxy server (Express) in development
+      '/api/gemini': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+        secure: false,
+      },
+      // Proxy /api/predict to local proxy during development so we avoid CORS and can use server-side PREDICT_ENDPOINT
+      '/api/predict': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+        secure: false,
+      },
     },
   },
   optimizeDeps: {
