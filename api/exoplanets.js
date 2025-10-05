@@ -3,40 +3,64 @@
 // It forwards the incoming query string to the upstream TAP sync endpoint and returns the response.
 
 module.exports = async (req, res) => {
+  const targetBase = 'https://exoplanetarchive.ipac.caltech.edu/TAP/sync';
   try {
-    const targetBase = 'https://exoplanetarchive.ipac.caltech.edu/TAP/sync';
-
-    // Extract the query string from the incoming URL (everything after '?')
+    // Build upstream URL preserving the incoming query string
     const incoming = req.url || '';
     const qs = incoming.includes('?') ? incoming.split('?').slice(1).join('?') : '';
     const upstreamUrl = qs ? `${targetBase}?${qs}` : targetBase;
 
-    // Forward only GET/HEAD for simplicity (the client uses GET)
-    const upstreamRes = await fetch(upstreamUrl, {
+    // Choose fetch implementation: global fetch or node-fetch fallback
+    let fetchImpl = globalThis.fetch;
+    if (!fetchImpl) {
+      // dynamic import to avoid adding node-fetch to client bundles
+      // eslint-disable-next-line node/no-unsupported-features/es-syntax
+      const nf = await import('node-fetch');
+      fetchImpl = nf.default || nf;
+    }
+
+    // Forward method, headers and body if present
+    const forwardHeaders = {};
+    // forward Accept and User-Agent at minimum
+    if (req.headers['accept']) forwardHeaders.accept = req.headers['accept'];
+    if (req.headers['user-agent']) forwardHeaders['user-agent'] = req.headers['user-agent'];
+
+    // If request has a body (POST), read it
+    let body = undefined;
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      // collect body from the incoming request
+      body = await new Promise((resolve) => {
+        const chunks = [];
+        req.on('data', (c) => chunks.push(c));
+        req.on('end', () => resolve(Buffer.concat(chunks)));
+        req.on('error', () => resolve(undefined));
+      });
+    }
+
+    console.log('Proxying to upstream:', upstreamUrl);
+
+    const upstreamRes = await fetchImpl(upstreamUrl, {
       method: req.method,
-      headers: {
-        // Accept JSON by default; allow upstream to decide
-        accept: req.headers['accept'] || 'application/json',
-        // Forward user-agent if present
-        'user-agent': req.headers['user-agent'] || 'node-fetch-proxy',
-      },
+      headers: forwardHeaders,
+      body,
     });
 
-    // Propagate status and content-type
+    // Mirror status and some headers
     res.statusCode = upstreamRes.status;
-    const contentType = upstreamRes.headers.get('content-type');
-    if (contentType) res.setHeader('content-type', contentType);
+    // Copy content-type and cache-control if provided
+    const ct = upstreamRes.headers.get('content-type');
+    if (ct) res.setHeader('content-type', ct);
+    const cc = upstreamRes.headers.get('cache-control');
+    if (cc) res.setHeader('cache-control', cc);
 
-    // Copy some cache headers if present
-    const cacheControl = upstreamRes.headers.get('cache-control');
-    if (cacheControl) res.setHeader('cache-control', cacheControl);
-
-    // Stream the body back (read as text to avoid stream complexity)
-    const body = await upstreamRes.text();
-    return res.end(body);
+    // Read upstream body as text and return
+    const text = await upstreamRes.text();
+    return res.end(text);
   } catch (err) {
-    console.error('Proxy error to exoplanet archive:', err);
+    console.error('Proxy error to exoplanet archive:', String(err));
     res.statusCode = 500;
-    return res.end(JSON.stringify({ error: 'Proxy error', detail: String(err) }));
+    // Return a JSON body with diagnostic hints (avoid leaking secrets)
+    res.setHeader('content-type', 'application/json');
+    return res.end(JSON.stringify({ error: 'Proxy error', message: String(err) }));
   }
 };
