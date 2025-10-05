@@ -270,7 +270,7 @@ function App() {
             {/* Imagen central de exoplaneta */}
             <div className="w-full flex justify-center mb-12">
               <img
-                src={`${import.meta.env.BASE_URL || '/'}static/exoplanet.png`}
+                src={`${import.meta.env.BASE_URL || '/'}src/static/exoplanet.png`}
                 alt="Exoplaneta"
                 onError={(ev) => {
                   // fallback a imagen pública si la local no existe en producción
