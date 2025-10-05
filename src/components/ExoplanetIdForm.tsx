@@ -142,6 +142,32 @@ const ExoplanetIdForm: FC<Props> = ({ onSubmit }) => {
           </div>
         )}
       </div>
+      <div className="mt-6 bg-slate-900/20 p-4 rounded-md border border-slate-700/20">
+        <h4 className="text-lg font-semibold text-white mb-2">Guía para Obtener IDs de Kepler y TESS</h4>
+        <p className="text-sm text-slate-300 mb-2">Para usar la función de visualización de curvas de luz necesitas el identificador único del objeto. A continuación se explica cómo encontrarlo en los archivos oficiales de la NASA.</p>
+
+        <div className="text-sm text-slate-300 mb-3">
+          <h5 className="font-semibold">1. Para la Misión Kepler (KepID / KIC ID)</h5>
+          <p className="mt-1">El identificador de Kepler se conoce como <strong>KepID</strong> o <strong>KIC ID</strong>.</p>
+          <p className="mt-1">Ve al archivo de exoplanetas de la NASA y abre los datos de Kepler:</p>
+          <p className="mt-1">
+            <a href="https://exoplanetarchive.ipac.caltech.edu/cgi-bin/TblView/nph-tblView?app=ExoTbls&config=cumulative" target="_blank" rel="noopener noreferrer" className="text-cyan-300 underline">Abrir datos de la NASA (Kepler)</a>
+          </p>
+          <p className="mt-1">Dentro de la tabla interactiva, busca por nombre (ej. "Kepler-186f") o explora la lista. La primera columna se llama <strong>kepid</strong>, ese es el número que necesitas. Ejemplo: Kepler-186f → <strong>8462852</strong>.</p>
+        </div>
+
+        <div className="text-sm text-slate-300 mb-3">
+          <h5 className="font-semibold">2. Para la Misión TESS (TIC ID)</h5>
+          <p className="mt-1">El identificador de TESS se llama <strong>TIC ID</strong> (TESS Input Catalog ID).</p>
+          <p className="mt-1">Abre los datos de TESS en el archivo de exoplanetas de la NASA:</p>
+          <p className="mt-1">
+            <a href="https://exoplanetarchive.ipac.caltech.edu/cgi-bin/TblView/nph-tblView?app=ExoTbls&config=TOI" target="_blank" rel="noopener noreferrer" className="text-cyan-300 underline">Abrir datos de la NASA (TESS / TOI)</a>
+          </p>
+          <p className="mt-1">En la tabla de candidatos de TESS busca el objeto de interés. La columna relevante suele llamarse "TESS Input Catalog ID" o similar. Ejemplo: TOI 700 d → <strong>200063161</strong>.</p>
+        </div>
+
+        <p className="text-xs text-slate-400">Si necesitas ayuda para localizar el ID de un objeto en particular, dímelo y puedo intentar buscarlo por ti.</p>
+      </div>
       <div className="mt-6 bg-slate-900/30 p-4 rounded-md border border-slate-700/20">
         <h4 className="text-lg font-semibold text-white mb-2">¿Qué muestra la gráfica?</h4>
         <p className="text-sm text-slate-300 mb-2">La gráfica muestra el brillo (flujo) de la estrella a lo largo del tiempo.</p>
