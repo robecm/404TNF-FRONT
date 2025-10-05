@@ -1,5 +1,7 @@
 import { useEffect, useState, FC } from "react";
 import { Globe, Star } from "lucide-react";
+import ExoplanetSearchForm from './ExoplanetSearchForm';
+import ExoplanetBulkUpload from './ExoplanetBulkUpload';
 
 type Exoplanet = {
   pl_name: string;
@@ -224,6 +226,13 @@ const ExoplanetCards: FC = () => {
             </button>
           </div>
         ))}
+      </div>
+      {/* Formulario para buscar/registrar tu propio exoplaneta */}
+      <div className="mt-8">
+        <ExoplanetSearchForm />
+      </div>
+      <div className="mt-4">
+        <ExoplanetBulkUpload />
       </div>
     </div>
   );

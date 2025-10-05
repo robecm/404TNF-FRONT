@@ -3,6 +3,7 @@ import { Rocket, Sparkles, Star } from 'lucide-react';
 import ExoplanetExamples from './components/ExoplanetExamples';
 import ExoplanetCards from './components/ExoplanetCards';
 import JourneyCards from './components/JourneyCards';
+import TransitExplanation from './components/TransitExplanation';
 import ExoplanetDetail from './components/ExoplanetDetail';
 
 interface StarType {
@@ -277,6 +278,7 @@ function App() {
           {showJourneyCards && (
             <div className="mt-12">
               <JourneyCards />
+              <TransitExplanation videoId="TVJmC19juU0" />
             </div>
           )}
         </div>
@@ -328,6 +330,7 @@ function App() {
 
             {/* Cards Grid (moved to JourneyCards component) */}
             <JourneyCards />
+            <TransitExplanation videoId="TVJmC19juU0" />
 
             {/* Dynamic Exoplanet Cards (fetched from remote via proxy) */}
             <div className="w-full max-w-6xl">
