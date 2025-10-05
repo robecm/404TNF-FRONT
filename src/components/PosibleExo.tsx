@@ -93,9 +93,9 @@ const PosibleExo: FC<{ name: string }> = ({ name }) => {
     }
     setData(parsed);
 
-    // intentar resolver imagen por varios medios (similar a App.tsx)
-    const bundled = new URL('../static/exoplanet.png', import.meta.url).href;
-    setImgSrc(bundled);
+  // usar CDN público por default
+  const cdn = 'https://cdn.pixabay.com/photo/2024/09/23/08/48/planet-9068292_960_720.png';
+  setImgSrc(cdn);
   }, [name]);
 
   return (

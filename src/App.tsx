@@ -27,40 +27,42 @@ function App() {
 
   useEffect(() => {
     let mounted = true;
-  const localPath = `${import.meta.env.BASE_URL || '/'}static/exoplanet.png`;
-    const nasaBackup = 'https://assets.science.nasa.gov/dynamicimage/assets/science/astro/exo-explore/assets/content/planets/neptunelike-8.jpg?fit=clip&crop=faces%2Cfocalpoint&w=300';
+  const localPath = 'https://cdn.pixabay.com/photo/2024/09/23/08/48/planet-9068292_960_720.png';
+  const nasaBackup = 'https://assets.science.nasa.gov/dynamicimage/assets/science/astro/exo-explore/assets/content/planets/neptunelike-8.jpg?fit=clip&crop=faces%2Cfocalpoint&w=300';
 
     // Bundled asset URL (pacquetizado por Vite). Se usa como último recurso y no genera 404s externos.
     const bundledLocal = new URL('./static/exoplanet.png', import.meta.url).href;
 
+    let createdBlobUrl: string | null = null;
     (async () => {
       try {
-        // 1) Intentar comprobar si la imagen pública existe (ruta en /public/static)
-        try {
-          const resLocal = await fetch(localPath, { method: 'HEAD' });
-          if (resLocal.ok) {
-            if (!mounted) return;
-            // asignar la ruta pública directamente para evitar blob: URLs
-            setExoplanetImgSrc(localPath);
-            return;
-          }
-        } catch {
-          // Ignorar errores de HEAD; intentaremos el backup
+        // 1) Intentar cargar la imagen local (posible ruta pública)
+        const resLocal = await fetch(localPath);
+        if (resLocal.ok) {
+          const blob = await resLocal.blob();
+          if (!mounted) return;
+          createdBlobUrl = URL.createObjectURL(blob);
+          setExoplanetImgSrc(createdBlobUrl);
+          return;
         }
 
-        // 2) Intentar usar la imagen de la NASA directamente (si está disponible)
+        // 2) Si falla, intentar obtener la imagen desde la CDN de la NASA mediante fetch.
+        // Hacemos fetch explícito para que, si responde 404, lo manejemos sin asignar la URL
+        // directamente al <img> (evita que el navegador haga la petición y muestre 404 en consola).
         try {
-          const resNasa = await fetch(nasaBackup, { method: 'HEAD' });
+          const resNasa = await fetch(nasaBackup);
           if (resNasa.ok) {
+            const blob = await resNasa.blob();
             if (!mounted) return;
-            setExoplanetImgSrc(nasaBackup);
+            createdBlobUrl = URL.createObjectURL(blob);
+            setExoplanetImgSrc(createdBlobUrl);
             return;
           }
         } catch {
-          // ignorar errores
+          // ignorar errores de fetch a NASA; caeremos al fallback empaquetado
         }
 
-        // 3) Fallback final: usar la imagen empaquetada (no genera peticiones externas que puedan 404)
+  // 3) Fallback final: usar la imagen empaquetada (no genera peticiones externas que puedan 404)
         if (!mounted) return;
         setExoplanetImgSrc(bundledLocal);
       } catch {
@@ -71,6 +73,7 @@ function App() {
 
     return () => {
       mounted = false;
+      if (createdBlobUrl) URL.revokeObjectURL(createdBlobUrl);
     };
   }, []);
 

@@ -157,13 +157,15 @@ const ExoplanetCards: FC = () => {
         const candidate = buildNasaImageUrl(p.pl_name, p.pl_rade, p.pl_bmasse, nextIdx);
         if (failedImageUrls.has(candidate)) continue;
         try {
-          const res = await fetch(candidate, { method: 'HEAD' });
+          const res = await fetch(candidate);
           if (!res.ok) {
             failedImageUrls.add(candidate);
             continue;
           }
-          // Si el HEAD fue ok, asignamos la URL candidata directamente (evitamos blobs)
-          return candidate;
+          const blob = await res.blob();
+          const blobUrl = URL.createObjectURL(blob);
+          createdBlobsRef.current.push(blobUrl);
+          return blobUrl;
         } catch {
           failedImageUrls.add(candidate);
           continue;
@@ -196,9 +198,10 @@ const ExoplanetCards: FC = () => {
     };
   }, [currentPage, planets, imageSrcs]);
 
-  // No hay blobs creados en la versión actual; limpiado innecesario
+  // cleanup blobs al desmontar
   useEffect(() => {
     return () => {
+      createdBlobsRef.current.forEach((b) => URL.revokeObjectURL(b));
       createdBlobsRef.current = [];
     };
   }, []);
