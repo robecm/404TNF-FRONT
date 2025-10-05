@@ -1,14 +1,13 @@
 import { FC, useEffect, useRef, useState } from 'react';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// IMPORTANT: Store your API key in a .env.local file at the project root
-// VITE_GEMINI_API_KEY="YOUR_API_KEY_HERE"
 const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
 
 type Payload = {
   koi_prad: number;
   koi_model_snr: number;
   koi_depth: number;
+
   koi_impact: number;
   koi_duration: number;
   koi_period?: number;
@@ -26,7 +25,9 @@ const PosibleExo: FC<{ name:string }> = ({ name }) => {
   const [prediction, setPrediction] = useState<{ verdict: string; confidence: number } | null>(null);
   const [geminiSummary, setGeminiSummary] = useState<string>('');
   const [summaryLoading, setSummaryLoading] = useState(false);
+  const [isAudioLoading, setIsAudioLoading] = useState(false);
   const isInitialLoad = useRef(true);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     const storageKey = `possibleExo::${name}`;
@@ -133,6 +134,61 @@ ${jsonDataString}
     void fetchSummary();
   }, [data, prediction, name]);
 
+  const handlePlayAudio = async () => {
+    if (!geminiSummary || isAudioLoading) return;
+
+    if (audioRef.current) {
+      audioRef.current.play();
+      return;
+    }
+
+    setIsAudioLoading(true);
+
+    const ELEVENLABS_API_KEY = import.meta.env.VITE_ELEVENLABS_API_KEY;
+    const VOICE_ID = "JBFqnCBsd6RMkjVDRZzb";
+    const url = `https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}`;
+
+    const headers = {
+      "Accept": "audio/mpeg",
+      "Content-Type": "application/json",
+      "xi-api-key": ELEVENLABS_API_KEY,
+    };
+
+    // TODO Use only the first 10 words for TTS to limit length
+    const shortText = geminiSummary.split(' ').slice(0, 10).join(' ');
+
+    const data = {
+      "text": shortText, //replace with gemini Summary
+      "model_id": "eleven_multilingual_v2",
+      "voice_settings": {
+        "stability": 0.5,
+        "similarity_boost": 0.75,
+      },
+    };
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(data),
+      });
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const audioUrl = URL.createObjectURL(blob);
+        const audio = new Audio(audioUrl);
+        audioRef.current = audio;
+        audio.play();
+      } else {
+        console.error("Error generating audio:", response.status, await response.text());
+      }
+    } catch (error) {
+      console.error("Error fetching TTS audio:", error);
+    } finally {
+      setIsAudioLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-black via-indigo-950 to-purple-950 text-white p-8">
       <div className="max-w-4xl mx-auto bg-slate-900/40 p-6 rounded-lg border border-slate-700">
@@ -197,8 +253,34 @@ ${jsonDataString}
         <div className="max-w-4xl mx-auto mt-6">
           <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700">
             <h4 className="text-sm font-semibold mb-2 text-cyan-300">Resumen de Gemini</h4>
-            {summaryLoading && <div className="text-sm text-slate-400">Generando resumen...</div>}
-            {geminiSummary && <p className="text-sm text-slate-200 leading-relaxed">{geminiSummary}</p>}
+            <div className="flex items-start gap-4">
+              <div className="flex-grow">
+                {summaryLoading && <div className="text-sm text-slate-400">Generando resumen...</div>}
+                {geminiSummary && <p className="text-sm text-slate-200 leading-relaxed">{geminiSummary}</p>}
+              </div>
+              {geminiSummary && !summaryLoading && (
+                <div className="flex-shrink-0">
+                  <button
+                    onClick={handlePlayAudio}
+                    disabled={isAudioLoading}
+                    className="bg-pink-900/60 hover:bg-pink-800/70 text-white p-3 rounded-lg border border-pink-700/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    aria-label="Leer resumen"
+                  >
+                    {isAudioLoading ? (
+                      <svg className="animate-spin h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                    ) : (
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
