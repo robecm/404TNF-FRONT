@@ -84,7 +84,7 @@ const ExoplanetIdForm: FC<Props> = ({ onSubmit }) => {
 
   return (
     <div className="mt-10 bg-gradient-to-br from-black/30 to-slate-900/40 p-6 rounded-xl border border-slate-700/30">
-      <h3 className="text-2xl md:text-3xl font-bold text-white mb-3">Buscar por ID</h3>
+      <h3 className="text-2xl md:text-3xl font-bold text-white mb-3">Buscar por ID de misión</h3>
       <p className="text-sm text-slate-400 mb-4">Introduce un identificador y selecciona la misión para ir al detalle del objeto.</p>
 
       <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4" noValidate>
