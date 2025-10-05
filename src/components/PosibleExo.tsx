@@ -50,7 +50,7 @@ const PosibleExo: FC<{ name:string }> = ({ name }) => {
         return;
       }
       try {
-        const res = await fetch('/api/predict', {
+        const res = await fetch('https://back-557899680969.us-south1.run.app/predict', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -175,7 +175,7 @@ ${jsonDataString}
             <div className="mt-0 p-0">
               <div className="mt-0 p-3 bg-slate-800/60 rounded border border-slate-700">
                 <div className="flex items-center justify-between">
-                  <div className="text-sm">Resultado del modelo</div>
+                  <div className="text-sm">Resultado del servidor</div>
                   <div className={`font-semibold ${(() => { const v = prediction.verdict.toLowerCase(); return v.includes('false') || v.includes('false positive') ? 'text-rose-400' : 'text-cyan-300'; })()}`}>{prediction.verdict}</div>
                 </div>
                 <div className="mt-2 flex items-center gap-3">
