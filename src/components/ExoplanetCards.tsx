@@ -72,20 +72,33 @@ const ExoplanetCards: FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch(API_URL)
-      .then((res) => {
+    const attemptFetch = async () => {
+      setLoading(true);
+      setError(null);
+      const altUrl = `/api/exoplanets?query=${encodeURIComponent(API_QUERY)}&format=json`;
+      try {
+        let res = await fetch(API_URL);
+        if (!res.ok) {
+          // intentar URL alternativa relativa
+          console.warn('[ExoplanetCards] primary API failed, trying altUrl', API_URL, res.status);
+          res = await fetch(altUrl);
+        }
         if (!res.ok) throw new Error(`Error HTTP ${res.status}`);
-        return res.json();
-      })
-      .then((data: Exoplanet[]) => {
+        const data: Exoplanet[] = await res.json();
         const withImgs = data.map((p) => ({
           ...p,
           image_url: buildNasaImageUrl(p.pl_name, p.pl_rade, p.pl_bmasse),
         }));
         setPlanets(withImgs);
-      })
-      .catch((err: Error) => setError(err.message))
-      .finally(() => setLoading(false));
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setError(msg);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    attemptFetch();
   }, []);
 
   if (loading)

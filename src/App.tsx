@@ -272,6 +272,11 @@ function App() {
               <img
                 src={`${import.meta.env.BASE_URL || '/'}static/exoplanet.png`}
                 alt="Exoplaneta"
+                onError={(ev) => {
+                  // fallback a imagen pública si la local no existe en producción
+                  ev.currentTarget.onerror = null;
+                  ev.currentTarget.src = 'https://assets.science.nasa.gov/dynamicimage/assets/science/astro/exo-explore/assets/content/planets/neptunelike-8.jpg?fit=clip&crop=faces%2Cfocalpoint&w=300';
+                }}
                 className="w-40 md:w-56 lg:w-72 rounded-lg shadow-2xl object-contain animate-fade-in"
               />
             </div>
