@@ -270,7 +270,7 @@ function App() {
             {/* Imagen central de exoplaneta */}
             <div className="w-full flex justify-center mb-12">
               <img
-                src="/static/exoplanet.png"
+                src={`${import.meta.env.BASE_URL || '/'}static/exoplanet.png`}
                 alt="Exoplaneta"
                 className="w-40 md:w-56 lg:w-72 rounded-lg shadow-2xl object-contain animate-fade-in"
               />

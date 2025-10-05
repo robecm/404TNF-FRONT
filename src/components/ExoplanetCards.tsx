@@ -12,8 +12,16 @@ type Exoplanet = {
   image_url?: string;
 };
 
-const API_URL =
-  "/api/exoplanets?query=select+top+12+pl_name,hostname,discoverymethod,disc_year,pl_rade,pl_bmasse,sy_dist+from+pscomppars+order+by+disc_year+desc&format=json";
+// Construye la URL del API usando VITE_API_BASE si está definida en producción.
+// En desarrollo Vite normalmente usa un proxy en /api; en producción debes
+// apuntar VITE_API_BASE a tu backend (por ejemplo https://api.exoptolemy.study)
+const API_QUERY =
+  'select top 12 pl_name,hostname,discoverymethod,disc_year,pl_rade,pl_bmasse,sy_dist from pscomppars order by disc_year desc';
+
+// Acceso seguro a import.meta.env sin usar `any` explícito
+const env = (import.meta as unknown) as { env: Record<string, string | undefined> };
+const API_BASE = env.env.VITE_API_BASE || '';
+const API_URL = `${API_BASE}/api/exoplanets?query=${encodeURIComponent(API_QUERY)}&format=json`;
 
 // Base de imágenes NASA
 const NASA_IMG_BASE =
