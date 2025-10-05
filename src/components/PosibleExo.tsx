@@ -60,12 +60,12 @@ const PosibleExo: FC<{ name:string }> = ({ name }) => {
   }, [name]);
 
   const handleBack = () => {
-    // Force return to local dev front-end host
+    // Regresar a la raíz de la aplicación
     try {
-      window.location.href = 'http://localhost:5173/posibleExo/';
-    } catch {
-      // fallback
       window.location.href = '/';
+    } catch {
+      // fallback: historial del navegador
+      history.back();
     }
   };
 
@@ -229,10 +229,10 @@ ${jsonDataString}
     };
 
     // TODO Use only the first 10 words for TTS to limit length
-    const shortText = geminiSummary.split(' ').slice(0, 10).join(' ');
+     // const shortText = geminiSummary.split(' ').slice(0, 10).join(' ');
 
     const data = {
-      "text": shortText, //replace with gemini Summary
+      "text": geminiSummary, //replace with gemini Summary
       "model_id": "eleven_multilingual_v2",
       "voice_settings": {
         "stability": 0.5,
